@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="theme-color" content="#05060C">
+<title>Ficha do lote — Cabo Brisa</title>
+<meta name="description" content="Ficha técnica do lote em estoque na Cabo Brisa, em Cabo Frio.">
+<link href="https://fonts.googleapis.com/css2?family=Anton&family=Fraunces:ital,opsz,wght@1,9..144,500&family=Space+Grotesk:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+:root{--fundo:#05060C;--roxo-3:#2A2A45;--neon:#B8F04A;--texto:#DCE7F2;--suave:#93A5B8;--ciano:#4BE7F0;
+--display:"Anton",Impact,sans-serif;--serif:"Fraunces",Georgia,serif;--mono:ui-monospace,"Courier New",monospace;--corpo:"Space Grotesk",system-ui,sans-serif}
+*{box-sizing:border-box}
+body{margin:0;background:var(--fundo);color:var(--texto);font-family:var(--corpo);line-height:1.55;padding:26px 18px 60px}
+a{color:var(--ciano)}
+.topo{max-width:720px;margin:0 auto 26px}
+.topo a{font-family:var(--mono);font-size:10px;letter-spacing:.2em;text-transform:uppercase;text-decoration:none}
+.foto{max-width:720px;margin:0 auto;aspect-ratio:16/10;background:#0A0B14;border:1px solid var(--roxo-3);overflow:hidden;display:grid;place-items:center;font-size:60px}
+.foto img{width:100%;height:100%;object-fit:cover;display:block}
+.conteudo{max-width:720px;margin:0 auto}
+h1{font-family:var(--serif);font-style:italic;font-weight:500;font-size:clamp(26px,7vw,38px);color:#F1FFE8;margin:22px 0 6px}
+.preco{font-family:var(--display);font-size:34px;color:var(--neon);margin-bottom:20px}
+.preco small{font-family:var(--mono);font-size:11px;color:var(--suave);letter-spacing:.12em}
+dl{display:grid;gap:12px;margin:0 0 26px}
+dl div{display:grid;grid-template-columns:150px 1fr;gap:12px;border-bottom:1px dashed rgba(184,240,74,.15);padding-bottom:12px}
+dt{font-family:var(--mono);font-size:10px;letter-spacing:.16em;text-transform:uppercase;color:var(--neon)}
+dd{margin:0;font-size:15px}
+.botao{display:inline-block;background:var(--neon);color:#07090E;border:none;border-radius:3px;font-family:var(--display);
+font-size:13px;letter-spacing:.16em;text-transform:uppercase;padding:13px 26px;text-decoration:none;cursor:pointer}
+.nota{font-size:13px;color:var(--suave);border-left:2px solid var(--ciano);padding-left:14px;margin-top:24px}
+@media(max-width:600px){dl div{grid-template-columns:1fr;gap:2px}}
+</style>
+</head>
+<body>
+
+<div class="topo"><a href="/">← voltar para a loja</a></div>
+<div class="foto" id="foto">🌿</div>
+
+<div class="conteudo" id="conteudo">
+  <h1 id="nome">carregando…</h1>
+</div>
+
+<script>
+var id = new URLSearchParams(location.search).get('id') || '1';
+
+function esc(t) {
+  return String(t).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
+
+fetch('/api/lote/' + encodeURIComponent(id), { cache: 'no-store' }).then(function (r) {
+  if (!r.ok) throw new Error('nao achei');
+  return r.json();
+}).then(function (l) {
+  document.title = l.nome + ' — Cabo Brisa';
+  document.getElementById('nome').textContent = l.nome;
+
+  if (l.foto) {
+    var img = document.createElement('img');
+    img.src = l.foto;
+    img.alt = l.nome;
+    img.onerror = function () { img.remove(); };
+    document.getElementById('foto').appendChild(img);
+  }
+
+  var html = '<p class="preco">R$ ' + Number(l.preco_g).toFixed(2).replace('.', ',') + ' <small>por grama</small></p>'
+    + '<dl>'
+    + '<div><dt>Origem</dt><dd>' + esc(l.origem || '—') + '</dd></div>'
+    + '<div><dt>Entrada</dt><dd>' + esc(l.entrada || '—') + '</dd></div>'
+    + '<div><dt>Aparência</dt><dd>' + esc(l.aparencia || '—') + '</dd></div>'
+    + '<div><dt>Cheiro</dt><dd>' + esc(l.cheiro || '—') + '</dd></div>'
+    + '<div><dt>Rendimento</dt><dd>cerca de 3 baseados por grama</dd></div>'
+    + '</dl>'
+    + '<a class="botao" href="/#cardapio">Pedir esse lote</a>'
+    + '<p class="nota">A ficha descreve o lote em estoque, não uma promessa de efeito. '
+    + 'Peso conferido antes de sair e embalagem fechada.</p>';
+
+  document.getElementById('conteudo').insertAdjacentHTML('beforeend', html);
+}).catch(function () {
+  document.getElementById('nome').textContent = 'Lote não encontrado';
+});
+</script>
+
+</body>
+</html>

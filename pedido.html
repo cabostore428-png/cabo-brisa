@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="theme-color" content="#05060C">
+<title>Rastreio — Cabo Brisa</title>
+<meta name="robots" content="noindex">
+<link href="https://fonts.googleapis.com/css2?family=Anton&family=Space+Grotesk:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+:root{--fundo:#05060C;--roxo-3:#2A2A45;--neon:#B8F04A;--texto:#DCE7F2;--suave:#93A5B8;--coral:#FF6A45;--ciano:#4BE7F0;
+--display:"Anton",Impact,sans-serif;--mono:ui-monospace,"Courier New",monospace;--corpo:"Space Grotesk",system-ui,sans-serif}
+*{box-sizing:border-box}
+body{margin:0;background:var(--fundo);color:var(--texto);font-family:var(--corpo);line-height:1.55;padding:26px 18px 60px}
+a{color:var(--ciano)}
+.topo{max-width:560px;margin:0 auto 26px}
+.topo a{font-family:var(--mono);font-size:10px;letter-spacing:.2em;text-transform:uppercase;text-decoration:none}
+h1{font-family:var(--display);font-size:clamp(28px,8vw,42px);text-transform:uppercase;letter-spacing:.02em;margin:14px 0 4px}
+.sub{font-family:var(--mono);font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--suave)}
+.caixa{max-width:560px;margin:0 auto;border:1px solid var(--roxo-3);background:#0B0C16;padding:24px}
+.codigo{font-family:var(--mono);font-size:26px;letter-spacing:.2em;color:var(--neon)}
+.status{font-family:var(--mono);font-size:12px;letter-spacing:.16em;text-transform:uppercase;color:var(--neon);margin:6px 0 22px}
+.trilha{display:grid;gap:12px;margin-bottom:22px}
+.etapa{display:flex;gap:12px;align-items:flex-start;opacity:.4}
+.etapa.feita{opacity:1}
+.etapa.atual{opacity:1}
+.etapa .bola{flex:0 0 14px;height:14px;border:1px solid var(--roxo-3);border-radius:50%;margin-top:4px}
+.etapa.feita .bola{background:var(--neon);border-color:var(--neon)}
+.etapa.atual .bola{border-color:var(--neon);box-shadow:0 0 12px var(--neon)}
+.etapa span{font-size:14px}
+.etapa.atual span{color:var(--neon);font-weight:700}
+.linha{border-top:1px solid var(--roxo-3);padding-top:14px;font-size:13px;color:var(--suave)}
+.linha b{color:var(--texto);display:block;font-family:var(--mono);font-size:10px;letter-spacing:.16em;text-transform:uppercase;margin-bottom:4px}
+.erro{border-color:var(--coral);color:var(--coral);font-family:var(--mono);font-size:12px}
+</style>
+</head>
+<body>
+
+<div class="topo">
+  <a href="/">← voltar para a loja</a>
+  <h1>Rastreio</h1>
+  <p class="sub">atualiza sozinho</p>
+</div>
+
+<div class="caixa" id="caixa">
+  <p class="sub">carregando…</p>
+</div>
+
+<script>
+var PASSOS = ['aguardando pix', 'pix confirmado', 'motoboy chamado', 'a caminho', 'entregue'];
+var params = new URLSearchParams(location.search);
+var codigo = (params.get('c') || '').toUpperCase();
+var segredo = params.get('s') || '';
+var caixa = document.getElementById('caixa');
+var parado = false;
+
+function esc(t) {
+  return String(t).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
+function data(ts) {
+  var d = new Date(ts);
+  return d.getDate() + '/' + (d.getMonth() + 1) + ' ' + String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0');
+}
+
+function pintar(p) {
+  var cancelado = p.status === 'cancelado';
+  var atual = PASSOS.indexOf(p.status);
+  var html = '<span class="codigo">' + esc(p.codigo) + '</span>'
+    + '<p class="status">' + esc(p.status) + '</p>';
+
+  if (!cancelado) {
+    html += '<div class="trilha">';
+    for (var i = 0; i < PASSOS.length; i++) {
+      var classe = i < atual ? 'feita' : (i === atual ? 'atual' : '');
+      html += '<div class="etapa ' + classe + '"><span class="bola"></span><span>' + esc(PASSOS[i]) + '</span></div>';
+    }
+    html += '</div>';
+  }
+
+  var end = {};
+  try { end = JSON.parse(p.endereco); } catch (e) {}
+
+  html += '<div class="linha"><b>total</b>R$ ' + Number(p.total).toFixed(2).replace('.', ',') + '</div>'
+    + '<div class="linha" style="margin-top:12px"><b>endereço</b>' + esc(end.endereco || '—') + '</div>'
+    + '<div class="linha" style="margin-top:12px"><b>pedido feito em</b>' + data(p.criado_em) + '</div>';
+
+  if (p.status === 'entregue') {
+    html += '<p style="margin-top:18px;font-size:13px;color:var(--neon)">Entregue. '
+      + '<a href="/#avaliacoes">Avaliar</a></p>';
+  }
+
+  caixa.innerHTML = html;
+  parado = p.status === 'entregue' || cancelado;
+}
+
+async function buscar() {
+  if (!codigo || !segredo) {
+    caixa.className = 'caixa erro';
+    caixa.textContent = 'Link incompleto. Abra pelo botão de rastreio da sua conta.';
+    parado = true;
+    return;
+  }
+  try {
+    var r = await fetch('/api/pedido/' + codigo + '?s=' + encodeURIComponent(segredo), { cache: 'no-store' });
+    if (!r.ok) {
+      caixa.className = 'caixa erro';
+      caixa.textContent = r.status === 403 ? 'Link inválido ou expirado.' : 'Pedido não encontrado.';
+      parado = true;
+      return;
+    }
+    caixa.className = 'caixa';
+    pintar(await r.json());
+  } catch (e) {
+    caixa.className = 'caixa erro';
+    caixa.textContent = 'Sem conexão. Tentando de novo…';
+  }
+}
+
+buscar();
+setInterval(function () { if (!parado) buscar(); }, 15000);
+</script>
+
+</body>
+</html>

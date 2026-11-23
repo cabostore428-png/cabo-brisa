@@ -1,0 +1,13 @@
+{
+  "name": "cabo-brisa",
+  "version": "1.0.0",
+  "private": true,
+  "main": "servidor.js",
+  "scripts": { "start": "node servidor.js" },
+  "dependencies": {
+    "bcryptjs": "^2.4.3",
+    "better-sqlite3": "^11.3.0",
+    "cookie-parser": "^1.4.6",
+    "express": "^4.19.2"
+  }
+}
