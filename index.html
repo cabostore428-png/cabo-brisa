@@ -446,6 +446,14 @@ main { padding: 0 20px; }
 }
 .conta-botao:hover { background: var(--neon); color: #07090E; }
 
+.som-botao {
+  position: absolute; top: 52px; right: 20px; z-index: 5;
+  font-family: var(--mono); font-size: 9px; letter-spacing: .18em; text-transform: uppercase;
+  background: rgba(6,10,16,.6); border: 1px solid rgba(75,231,240,.5); color: var(--ciano);
+  padding: 8px 13px; border-radius: 3px; cursor: pointer; backdrop-filter: blur(4px);
+}
+.som-botao:hover { background: var(--ciano); color: #07090E; }
+
 .modal {
   position: fixed; inset: 0; z-index: 200; display: none;
   align-items: center; justify-content: center; padding: 20px;
@@ -526,8 +534,8 @@ main { padding: 0 20px; }
 }
 .chat-botao:hover { background: var(--neon); color: #07090E; }
 .chat-janela {
-  position: fixed; right: 16px; bottom: 138px; z-index: 81;
-  width: min(340px, calc(100% - 32px)); max-height: 62vh;
+  position: fixed; right: 16px; bottom: calc(84px + env(safe-area-inset-bottom)); z-index: 81;
+  width: min(340px, calc(100% - 32px)); max-height: min(58vh, calc(100vh - 210px));
   background: #0B0C16; border: 1px solid var(--neon);
   display: none; flex-direction: column;
 }
@@ -713,7 +721,7 @@ footer .miudo { font-family: var(--mono); font-size: 10px; letter-spacing: .22em
   .hud { font-size: 8px; letter-spacing: .18em; gap: 10px; }
   .hud-baixo span:first-child { display: none; }
   #boot { font-size: 11px; }
-  .chat-janela { max-height: 55vh; }
+  .chat-janela { right: 12px; left: 12px; width: auto; max-height: 55vh; }
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -764,13 +772,14 @@ footer .miudo { font-family: var(--mono); font-size: 10px; letter-spacing: .22em
   <div class="scan" aria-hidden="true"></div>
 
   <button class="conta-botao" id="contaBotao" onclick="abrirConta()">entrar</button>
+  <button class="som-botao" id="somBotao" onclick="alternarSom()">som on</button>
 
   <img class="boneco" src="boneco.png" alt="" onerror="tentarBoneco(this)">
 
   <div class="hero-grade">
     <div class="etiquetas">
       <span class="etq cheia">Cabo Frio · entrega na porta</span>
-      <span class="etq promo" id="tagPromo">promo R$ 10/g</span>
+      <span class="etq promo" id="tagPromo">5 g por R$ 25</span>
       <span class="etq">pix</span>
     </div>
     <h1>Cabo<br><span>Brisa</span></h1>
@@ -815,21 +824,21 @@ footer .miudo { font-family: var(--mono); font-size: 10px; letter-spacing: .22em
         <div class="corpo">
           <h3>Maconha</h3>
           <p class="spec">prensado · por grama</p>
-          <p class="desc">Prensado do lote, embalado e entregue fechado. Rende cerca de 3 baseados por grama.</p>
+          <p class="desc">Prensado do lote, embalado e entregue fechado. 5 g rende 1 baseado.</p>
           <a class="ficha-link" href="lote.html?id=1">ficha do lote</a>
           <div class="preco-linha">
-            <span class="preco-g" id="preco-maconha">R$ 10</span>
+            <span class="preco-g" id="preco-maconha">R$ 5</span>
             <span class="preco-antigo" id="antigo-maconha">R$ 12</span>
             <span class="por-g">por g</span>
           </div>
           <div class="pedaco">
             <div class="gramas" id="gramas-maconha">
-              <button type="button" onclick="passo('maconha', -1)" aria-label="menos">−</button>
-              <input id="g-maconha" type="number" inputmode="decimal" value="1" min="1" step="1" onchange="digitar('maconha')">
+              <button type="button" onclick="passo('maconha', -5)" aria-label="menos">−</button>
+              <input id="g-maconha" type="number" inputmode="decimal" value="5" min="5" step="5" onchange="digitar('maconha')">
               <span class="un">g</span>
-              <button type="button" onclick="passo('maconha', 1)" aria-label="mais">+</button>
+              <button type="button" onclick="passo('maconha', 5)" aria-label="mais">+</button>
             </div>
-            <span class="total-item" id="item-maconha">R$ 10,00</span>
+            <span class="total-item" id="item-maconha">R$ 25,00</span>
           </div>
           <p class="aviso-estoque" id="aviso-maconha"></p>
           <div class="espera" id="espera-maconha"></div>
@@ -872,7 +881,7 @@ footer .miudo { font-family: var(--mono); font-size: 10px; letter-spacing: .22em
       <h3>Como ler o cardápio</h3>
       <p>Não é receita de médico. É o que o lote entrega.</p>
       <div class="grade-ler">
-        <div class="item-ler"><strong>Dose</strong><span>1 g de maconha dá 3 baseados. 0,5 g de cocaína dá de 5 a 10 carreiras.</span></div>
+        <div class="item-ler"><strong>Dose</strong><span>5 g de maconha dá 1 baseado. 0,5 g de cocaína dá de 5 a 10 carreiras.</span></div>
         <div class="item-ler"><strong>Tempo</strong><span>Maconha bate em 5 a 10 minutos. Cocaína bate em 5 minutos.</span></div>
         <div class="item-ler"><strong>Duração</strong><span>Maconha dura de 2 a 3 horas. Cocaína dura de 30 a 40 minutos.</span></div>
         <div class="item-ler"><strong>Primeira vez</strong><span>Uma tragada ou uma carreira já bastam. Não repita antes de 30 minutos e beba água.</span></div>
@@ -891,11 +900,11 @@ footer .miudo { font-family: var(--mono); font-size: 10px; letter-spacing: .22em
   <section class="secao" id="comparador">
     <div class="topo-secao">
       <h2>Quanto custa por baseado</h2>
-      <p>Para parar de achar que grama é caro.</p>
+      <p>5 g dão 1 baseado. Faça a conta com o quanto você quer.</p>
     </div>
     <div class="calc">
       <label for="calcG">Gramas</label>
-      <input id="calcG" type="number" min="1" step="1" value="3" oninput="calcularBaseado()">
+      <input id="calcG" type="number" min="5" step="5" value="5" oninput="calcularBaseado()">
       <div class="saida" id="calcSaida"></div>
     </div>
   </section>
@@ -908,20 +917,20 @@ footer .miudo { font-family: var(--mono); font-size: 10px; letter-spacing: .22em
 
     <div class="kits">
       <div class="kit">
-        <span class="economia">economize R$ 3</span>
+        <span class="economia">economize R$ 5</span>
         <h3>Kit Fim de Semana</h3>
-        <p class="spec">3 g de maconha</p>
-        <p class="obs">Dá para a noite toda e sobra.</p>
-        <div class="preco-linha"><span class="preco-g">R$ 27</span></div>
+        <p class="spec">10 g de maconha</p>
+        <p class="obs">Dá para várias noites e sobra.</p>
+        <div class="preco-linha"><span class="preco-g">R$ 45</span></div>
         <button id="kit-kit1" onclick="addKit('kit1')">Adicionar kit</button>
       </div>
 
       <div class="kit">
-        <span class="economia">economize R$ 5</span>
+        <span class="economia">economize R$ 20</span>
         <h3>Kit Semana</h3>
-        <p class="spec">5 g de maconha</p>
+        <p class="spec">20 g de maconha</p>
         <p class="obs">Para quem fuma todo dia ou divide com alguém.</p>
-        <div class="preco-linha"><span class="preco-g">R$ 45</span></div>
+        <div class="preco-linha"><span class="preco-g">R$ 80</span></div>
         <button id="kit-kit2" onclick="addKit('kit2')">Adicionar kit</button>
       </div>
     </div>
@@ -1045,7 +1054,7 @@ footer .miudo { font-family: var(--mono); font-size: 10px; letter-spacing: .22em
       <div><dt>Embalagem</dt><dd>Fechada, sem identificação por fora. Peso conferido antes de sair.</dd></div>
       <div><dt>Entrega</dt><dd>Motoboy do 99, chamado por nós depois do Pix. Você recebe nome e placa pelo WhatsApp.</dd></div>
       <div><dt>Pagamento</dt><dd>Pix. O comprovante é obrigatório antes da saída do pedido.</dd></div>
-      <div><dt>Mínimo</dt><dd>R$ 20 em produto. Na primeira compra com a amostra grátis, você paga só a entrega.</dd></div>
+      <div><dt>Mínimo</dt><dd>5 g de maconha. Na primeira compra com a amostra grátis, você paga só a entrega.</dd></div>
       <div><dt>Amostra</dt><dd>1 g grátis na primeira compra, uma vez por pessoa.</dd></div>
       <div><dt>Conta</dt><dd>Opcional. Quem tem conta guarda histórico, rastreia pedidos e entra no ranking.</dd></div>
     </dl>
@@ -1072,7 +1081,7 @@ footer .miudo { font-family: var(--mono); font-size: 10px; letter-spacing: .22em
 <footer>
   <blockquote>"A maconha não irá te matar, mas o cigarro irá."<span>Elbert Hubbard</span></blockquote>
   <a class="ig" href="https://www.instagram.com/cabobrisa.delivery/" target="_blank" rel="noopener">@cabobrisa.delivery</a>
-  <p class="miudo">maconha e cocaína · +18 · Cabo Frio · v5</p>
+  <p class="miudo">maconha e cocaína · +18 · Cabo Frio · v6</p>
 </footer>
 
 <button class="chat-botao" onclick="alternarChat()" aria-label="Conversar">✉</button>
@@ -1209,6 +1218,13 @@ footer .miudo { font-family: var(--mono); font-size: 10px; letter-spacing: .22em
 </div>
 
 <script>
+var API = 'https://api.cabostore.de';
+function api(caminho, opcoes) {
+  opcoes = opcoes || {};
+  opcoes.credentials = 'include';
+  return fetch(API + caminho, opcoes);
+}
+
 var CHAVE = 'cabo-brisa-carrinho-9';
 var CHAVE_PROMO = 'cb-fim-promo';
 var CHAVE_CUPOM = 'cb-cupom';
@@ -1218,6 +1234,7 @@ var CHAVE_ESPERA = 'cb-espera';
 var CHAVE_AMOSTRA = 'cb-amostra-usada';
 var CHAVE_PERFIL = 'cb-perfil';
 var CHAVE_CHAT = 'cb-chat-id';
+var CHAVE_SOM = 'cb-som';
 var MINIMO = 20;
 var GRATIS_ACIMA = 70;
 var MEU_WHATS = '5522981551818';
@@ -1226,16 +1243,16 @@ var INDICACAO_VALOR = 2;
 var NL = String.fromCharCode(10);
 var ALFA = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
 var SAL = 'cabo-brisa-2026';
-var VERSAO = 'v5';
+var VERSAO = 'v6';
 
 var PRODUTOS = {
-  maconha: { nome: 'Maconha', min: 1, precoG: function () { return emPromo() ? 10 : 12; } },
+  maconha: { nome: 'Maconha', min: 5, precoG: function () { return 5; } },
   cocaina: { nome: 'Coca-Colaína', min: 0.5, precoG: function () { return 40; } }
 };
 
 var KITS = {
-  kit1: { nome: 'Kit Fim de Semana', preco: 27, consome: { maconha: 3, cocaina: 0 } },
-  kit2: { nome: 'Kit Semana', preco: 45, consome: { maconha: 5, cocaina: 0 } }
+  kit1: { nome: 'Kit Fim de Semana', preco: 45, consome: { maconha: 10, cocaina: 0 } },
+  kit2: { nome: 'Kit Semana', preco: 80, consome: { maconha: 20, cocaina: 0 } }
 };
 
 var ESTOQUE = { maconha: 0, cocaina: 0 };
@@ -1259,6 +1276,10 @@ var chatUltimo = 0;
 var chatTimer = null;
 var quizPasso = 0;
 var quizResp = [];
+var somLigado = true;
+var ctxAudio = null;
+var ganhoMestre = null;
+var ambienteNos = [];
 
 console.log('Cabo Brisa ' + VERSAO);
 
@@ -1280,6 +1301,83 @@ function dataCurta(ts) {
   var d = new Date(ts);
   return d.getDate() + '/' + (d.getMonth() + 1);
 }
+
+/* ---------- som ---------- */
+
+function audio() {
+  if (!ctxAudio) {
+    var AC = window.AudioContext || window.webkitAudioContext;
+    if (!AC) return null;
+    ctxAudio = new AC();
+    ganhoMestre = ctxAudio.createGain();
+    ganhoMestre.gain.value = 0.45;
+    ganhoMestre.connect(ctxAudio.destination);
+  }
+  if (ctxAudio.state === 'suspended') ctxAudio.resume();
+  return ctxAudio;
+}
+
+function clique() {
+  if (!somLigado) return;
+  var c = audio();
+  if (!c) return;
+  var o = c.createOscillator(), g = c.createGain(), f = c.createBiquadFilter();
+  o.type = 'triangle';
+  o.frequency.setValueAtTime(920, c.currentTime);
+  o.frequency.exponentialRampToValueAtTime(430, c.currentTime + 0.08);
+  f.type = 'lowpass'; f.frequency.value = 2400;
+  g.gain.setValueAtTime(0.0001, c.currentTime);
+  g.gain.exponentialRampToValueAtTime(0.1, c.currentTime + 0.006);
+  g.gain.exponentialRampToValueAtTime(0.0001, c.currentTime + 0.13);
+  o.connect(f); f.connect(g); g.connect(ganhoMestre);
+  o.start(); o.stop(c.currentTime + 0.15);
+}
+
+function ambiente() {
+  if (!somLigado || ambienteNos.length) return;
+  var c = audio();
+  if (!c) return;
+  var base = c.createGain(); base.gain.value = 0.05; base.connect(ganhoMestre);
+  var filtro = c.createBiquadFilter(); filtro.type = 'lowpass';
+  filtro.frequency.value = 640; filtro.Q.value = 0.7; filtro.connect(base);
+
+  [55, 82.5, 110, 164.81, 220].forEach(function (f, i) {
+    var o = c.createOscillator();
+    o.type = i < 2 ? 'sine' : 'triangle';
+    o.frequency.value = f * (1 + (Math.random() - 0.5) * 0.004);
+    var g = c.createGain(); g.gain.value = 0.2 / (i + 1);
+    o.connect(g); g.connect(filtro);
+    var lfo = c.createOscillator(); lfo.frequency.value = 0.04 + i * 0.013;
+    var lg = c.createGain(); lg.gain.value = 0.08;
+    lfo.connect(lg); lg.connect(g.gain);
+    o.start(); lfo.start();
+    ambienteNos.push(o, lfo);
+  });
+
+  var sh = c.createOscillator(); sh.type = 'sine'; sh.frequency.value = 880;
+  var shg = c.createGain(); shg.gain.value = 0.01;
+  var shl = c.createOscillator(); shl.frequency.value = 0.07;
+  var shlg = c.createGain(); shlg.gain.value = 0.009;
+  shl.connect(shlg); shlg.connect(shg.gain);
+  sh.connect(shg); shg.connect(base); sh.start(); shl.start();
+  ambienteNos.push(sh, shl);
+}
+
+function pararAmbiente() {
+  ambienteNos.forEach(function (n) { try { n.stop(); } catch (e) {} });
+  ambienteNos = [];
+}
+
+function alternarSom() {
+  somLigado = !somLigado;
+  gravar(CHAVE_SOM, somLigado);
+  document.getElementById('somBotao').textContent = somLigado ? 'som on' : 'som off';
+  if (somLigado) { clique(); ambiente(); } else { pararAmbiente(); }
+}
+
+document.addEventListener('pointerdown', function (e) {
+  if (e.target.closest('button, a')) clique();
+}, true);
 
 function soma(s) {
   var h = 5381;
@@ -1340,7 +1438,7 @@ function kitPossivel(chave) {
 }
 
 function sincronizar() {
-  fetch('/api/estado', { cache: 'no-store' }).then(function (r) {
+  api('/api/estado', { cache: 'no-store' }).then(function (r) {
     if (!r.ok) return null;
     return r.json();
   }).then(function (d) {
@@ -1364,12 +1462,16 @@ function pintarVivo() {
 
 setInterval(sincronizar, 25000);
 
-/* ---------- entrada e intro ---------- */
+/* ---------- entrada ---------- */
 
 function entrar() {
   var p = document.getElementById('porta');
   var b = document.getElementById('boot');
   p.classList.add('saiu');
+
+  somLigado = ler(CHAVE_SOM, true) !== false;
+  document.getElementById('somBotao').textContent = somLigado ? 'som on' : 'som off';
+  if (somLigado) ambiente();
 
   var semMovimento = false;
   try { semMovimento = matchMedia('(prefers-reduced-motion: reduce)').matches; } catch (e) {}
@@ -1681,7 +1783,7 @@ async function enviarConta() {
 
   var rota = modoConta === 'cadastro' ? '/api/cadastro' : '/api/entrar';
   try {
-    var r = await fetch(rota, {
+    var r = await api(rota, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(corpo)
@@ -1696,7 +1798,7 @@ async function enviarConta() {
 
 async function carregarEu() {
   try {
-    var r = await fetch('/api/eu');
+    var r = await api('/api/eu');
     var d = await r.json();
     eu = d.logado ? d : null;
   } catch (e) { eu = null; }
@@ -1735,7 +1837,7 @@ function pintarConta() {
 }
 
 async function sairConta() {
-  await fetch('/api/sair', { method: 'POST' });
+  await api('/api/sair', { method: 'POST' });
   eu = null;
   carregarEu();
   carregarRanking();
@@ -1746,7 +1848,7 @@ async function sairConta() {
 async function carregarRanking() {
   var alvo = document.getElementById('listaRanking');
   try {
-    var r = await fetch('/api/ranking');
+    var r = await api('/api/ranking');
     var lista = await r.json();
     if (!lista.length) {
       alvo.innerHTML = '<p class="rank-vazio">Ninguém no ranking ainda. O primeiro pedido pode ser o seu.</p>';
@@ -1892,7 +1994,7 @@ function pegarCupom() {
 
   caixa.classList.add('mostrar');
 
-  fetch('/api/cupom', { method: 'POST' }).then(function (r) { return r.json(); }).then(function (d) {
+  api('/api/cupom', { method: 'POST' }).then(function (r) { return r.json(); }).then(function (d) {
     if (d.esgotado) {
       cod.textContent = 'ACABOU';
       val.textContent = 'Os cinco cupons já foram liberados.';
@@ -1916,7 +2018,7 @@ function aplicarCupom() {
   if (!seloValido(digitado)) { msg.textContent = 'Código inválido. Confira as letras.'; return; }
   if (descontoCupom > 0) { msg.textContent = 'Você já aplicou o cupom.'; return; }
 
-  fetch('/api/cupom/validar', {
+  api('/api/cupom/validar', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ codigo: digitado })
@@ -2015,9 +2117,9 @@ function responderQuiz(i) {
 function mostrarResultado() {
   var pontos = quizResp.reduce(function (a, b) { return a + b; }, 0);
   var g, texto;
-  if (pontos <= 1) { g = 1; texto = 'Uma grama resolve e sobra. Vai devagar na primeira tragada.'; }
-  else if (pontos <= 3) { g = 3; texto = 'Três gramas dão a noite inteira para duas pessoas.'; }
-  else { g = 5; texto = 'Cinco gramas é o kit de quem fuma todo dia.'; }
+  if (pontos <= 1) { g = 5; texto = 'Cinco gramas dão um baseado. Vai devagar na primeira tragada.'; }
+  else if (pontos <= 3) { g = 10; texto = 'Dez gramas dão dois baseados, para dividir.'; }
+  else { g = 20; texto = 'Vinte gramas é o kit de quem fuma todo dia.'; }
 
   document.getElementById('quizCaixa').innerHTML =
     '<div class="resultado mostrar"><strong>' + g + ' g</strong>'
@@ -2042,12 +2144,13 @@ function refazerQuiz() {
 function calcularBaseado() {
   var g = parseFloat(document.getElementById('calcG').value) || 0;
   var preco = PRODUTOS.maconha.precoG();
-  var baseados = g * 3;
+  var baseados = g / 5;
   var porBaseado = baseados ? (g * preco) / baseados : 0;
+  var quantos = baseados % 1 ? baseados.toFixed(1).replace('.', ',') : baseados;
   document.getElementById('calcSaida').innerHTML =
-    g + ' g = ' + baseados + ' baseados<br>'
+    g + ' g = ' + quantos + ' baseado(s)<br>'
     + 'custo: ' + formatar(g * preco) + '<br>'
-    + 'sai a ' + formatar(porBaseado) + ' por baseado';
+    + (baseados >= 1 ? 'sai a ' + formatar(porBaseado) + ' por baseado' : 'menos de um baseado');
 }
 
 /* ---------- avaliações ---------- */
@@ -2068,7 +2171,7 @@ async function enviarAval() {
   if (Date.now() - trava < 30000) { alert('Calma. Espere 30 segundos entre uma avaliação e outra.'); return; }
 
   try {
-    var r = await fetch('/api/avaliacoes', {
+    var r = await api('/api/avaliacoes', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ nota: notaAtual, texto: texto, pedido: pedido || null })
@@ -2116,7 +2219,7 @@ function pintarAval(lista) {
 
 async function carregarAval() {
   try {
-    var r = await fetch('/api/avaliacoes', { cache: 'no-store' });
+    var r = await api('/api/avaliacoes', { cache: 'no-store' });
     var lista = await r.json();
     pintarAval(Array.isArray(lista) ? lista : []);
   } catch (e) {
@@ -2129,7 +2232,7 @@ async function carregarAval() {
 async function carregarDiario() {
   var alvo = document.getElementById('listaDiario');
   try {
-    var r = await fetch('/api/diario', { cache: 'no-store' });
+    var r = await api('/api/diario', { cache: 'no-store' });
     var lista = await r.json();
     if (!lista.length) { alvo.innerHTML = '<p class="rank-vazio">Nada registrado ainda.</p>'; return; }
     var html = '';
@@ -2157,7 +2260,7 @@ function alternarChat() {
 async function abrirChat() {
   if (chatId) { buscarChat(); return; }
   try {
-    var r = await fetch('/api/chat/abrir', { method: 'POST' });
+    var r = await api('/api/chat/abrir', { method: 'POST' });
     var d = await r.json();
     chatId = d.id;
     try { localStorage.setItem(CHAVE_CHAT, String(chatId)); } catch (e) {}
@@ -2169,7 +2272,7 @@ async function abrirChat() {
 async function buscarChat() {
   if (!chatId) return;
   try {
-    var r = await fetch('/api/chat/' + chatId + '?desde=' + chatUltimo);
+    var r = await api('/api/chat/' + chatId + '?desde=' + chatUltimo);
     var lista = await r.json();
     var corpo = document.getElementById('chatCorpo');
     for (var i = 0; i < lista.length; i++) {
@@ -2190,7 +2293,7 @@ async function enviarChat() {
   if (!texto || !chatId) return;
   campo.value = '';
   try {
-    await fetch('/api/chat/' + chatId, {
+    await api('/api/chat/' + chatId, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ texto: texto })
@@ -2218,7 +2321,7 @@ async function pegarEgg() {
   document.getElementById('eggCaixa').classList.add('aberto');
   var chave = meuCodigo().replace('CB-', '');
   try {
-    var r = await fetch('/api/cupom/egg', {
+    var r = await api('/api/cupom/egg', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ chave: chave })
@@ -2316,7 +2419,7 @@ function finalizar() {
   var cupomUsado = document.getElementById('cupom').value.trim().toUpperCase();
   var cepUsado = document.getElementById('cep').value;
 
-  fetch('/api/pedido', {
+  api('/api/pedido', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
@@ -2515,21 +2618,15 @@ function atualizarProgresso() {
 
 /* ---------- início ---------- */
 
-if (MODO === 'pre-venda') {
-  document.getElementById('faixaPromo').textContent =
-    'pré-venda · reposição a caminho · entrega a combinar no WhatsApp';
-} else if (emPromo()) {
-  document.getElementById('faixaPromo').textContent =
-    'pedido mínimo R$ 20 · entrega R$ 5 em Cabo Frio · grátis acima de R$ 70 · promo R$ 10/g até ' + dataCurta(fimPromo());
-} else {
-  document.getElementById('faixaPromo').textContent =
-    'pedido mínimo R$ 20 · entrega R$ 5 em Cabo Frio · grátis acima de R$ 70 · R$ 12/g';
-  document.getElementById('antigo-maconha').style.display = 'none';
-  document.getElementById('tagPromo').style.display = 'none';
-}
+document.getElementById('faixaPromo').textContent =
+  'pré-venda · reposição a caminho · 5 g por R$ 25 · entrega a combinar';
 
-document.getElementById('preco-maconha').textContent = 'R$ ' + (emPromo() ? 10 : 12);
+document.getElementById('preco-maconha').textContent = 'R$ 5';
+document.getElementById('antigo-maconha').style.display = 'none';
 document.getElementById('meuCod').textContent = meuCodigo();
+
+somLigado = ler(CHAVE_SOM, true) !== false;
+document.getElementById('somBotao').textContent = somLigado ? 'som on' : 'som off';
 
 var daUrl = new URLSearchParams(location.search).get('ind');
 if (daUrl && seloValido(daUrl.toUpperCase())) {

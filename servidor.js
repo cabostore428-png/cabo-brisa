@@ -7,8 +7,9 @@ const path = require('path');
 
 const ADMIN = process.env.ADMIN_TOKEN || 'troque-este-token';
 const PORT = process.env.PORT || 3000;
+const DB_PATH = process.env.DB_PATH || 'cabo.db';
 
-const db = new Database('cabo.db');
+const db = new Database(DB_PATH);
 db.pragma('journal_mode = WAL');
 
 db.exec(`
@@ -58,13 +59,13 @@ if (!db.prepare('SELECT COUNT(*) c FROM lotes').get().c) {
   db.prepare(`INSERT INTO lotes (nome, foto, origem, entrada, aparencia, cheiro, preco_g)
     VALUES (?, ?, ?, ?, ?, ?, ?)`).run(
     'Prensado do lote 12', 'lote1.jpg', 'Cabo Frio', 'pré-venda',
-    'Bloco compacto, marrom escuro, sem mofo', 'Terra e madeira', 10);
+    'Bloco compacto, marrom escuro, sem mofo', 'Terra e madeira', 5);
   db.prepare('INSERT INTO diario (texto, criado_em) VALUES (?, ?)')
     .run('Reposição a caminho. A pré-venda segue aberta.', Date.now());
 }
 
-const PRECOS = { maconha: 10, cocaina: 40 };
-const KITS = { kit1: { preco: 27, maconha: 3 }, kit2: { preco: 45, maconha: 5 } };
+const PRECOS = { maconha: 5, cocaina: 40 };
+const KITS = { kit1: { preco: 45, maconha: 10 }, kit2: { preco: 80, maconha: 20 } };
 const MINIMO = 20;
 const GRATIS_ACIMA = 70;
 const FRETE = { cabofrio: 5, vizinha: 12, fora: 15 };
@@ -72,7 +73,32 @@ const FRETE = { cabofrio: 5, vizinha: 12, fora: 15 };
 const app = express();
 app.use(express.json());
 app.use(cookie());
+
+app.use((req, res, next) => {
+  const o = req.headers.origin;
+  if (o && /^https:\/\/(www\.)?cabostore\.de$/.test(o)) {
+    res.setHeader('Access-Control-Allow-Origin', o);
+    res.setHeader('Access-Control-Allow-Credentials', 'true');
+    res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+    res.setHeader('Access-Control-Allow-Methods', 'GET,POST,OPTIONS');
+  }
+  if (req.method === 'OPTIONS') return res.sendStatus(204);
+  next();
+});
+
 app.use(express.static(path.join(__dirname), { extensions: ['html'] }));
+
+async function notificar(texto) {
+  const tok = process.env.TELEGRAM_TOKEN, chat = process.env.TELEGRAM_CHAT;
+  if (!tok || !chat) return;
+  try {
+    await fetch('https://api.telegram.org/bot' + tok + '/sendMessage', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ chat_id: chat, text: texto, parse_mode: 'HTML' })
+    });
+  } catch (e) {}
+}
 
 function usuarioDoReq(req) {
   const t = req.cookies.cb_sessao;
@@ -183,14 +209,13 @@ app.get('/api/ranking', (req, res) => {
 });
 
 app.post('/api/cupom', (req, res) => {
-  const total = db.prepare('SELECT COUNT(*) c FROM cupons WHERE codigo LIKE ?').get('CB-%').c;
   const usados = db.prepare("SELECT COUNT(*) c FROM cupons WHERE codigo NOT LIKE 'CB-EGG-%'").get().c;
   if (usados >= 5) return res.json({ esgotado: true });
 
   const codigo = 'CB-' + crypto.randomBytes(3).toString('hex').toUpperCase();
   const validade = Date.now() + 60 * 86400000;
   db.prepare('INSERT INTO cupons (codigo, valor, validade) VALUES (?, 5, ?)').run(codigo, validade);
-  res.json({ codigo, validade, total });
+  res.json({ codigo, validade });
 });
 
 app.post('/api/cupom/validar', (req, res) => {
@@ -268,6 +293,8 @@ app.post('/api/pedido', (req, res) => {
   db.prepare("UPDATE estoque SET valor = valor - ? WHERE chave = 'maconha'").run(consumido.maconha);
   db.prepare("UPDATE estoque SET valor = valor - ? WHERE chave = 'cocaina'").run(consumido.cocaina);
 
+  notificar('Pedido ' + codigo + '\nR$ ' + total.toFixed(2) + '\n' + endereco);
+
   res.json({ codigo, segredo, subtotal, entrega: taxa, desconto, total, zona });
 });
 
@@ -312,6 +339,7 @@ app.post('/api/chat/:id', (req, res) => {
   if (!texto) return res.status(400).json({ erro: 'vazio' });
   const r = db.prepare('INSERT INTO mensagens (conversa_id, de, texto, criado_em) VALUES (?, ?, ?, ?)')
     .run(req.params.id, de === 'loja' ? 'loja' : 'cliente', texto.slice(0, 500), Date.now());
+  if (de !== 'loja') notificar('Nova mensagem (conversa ' + req.params.id + ')\n' + texto.slice(0, 300));
   res.json({ id: r.lastInsertRowid });
 });
 

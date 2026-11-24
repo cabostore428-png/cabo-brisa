@@ -41,13 +41,14 @@ font-size:13px;letter-spacing:.16em;text-transform:uppercase;padding:13px 26px;t
 </div>
 
 <script>
+var API = 'https://api.cabostore.de';
 var id = new URLSearchParams(location.search).get('id') || '1';
 
 function esc(t) {
   return String(t).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 }
 
-fetch('/api/lote/' + encodeURIComponent(id), { cache: 'no-store' }).then(function (r) {
+fetch(API + '/api/lote/' + encodeURIComponent(id), { cache: 'no-store' }).then(function (r) {
   if (!r.ok) throw new Error('nao achei');
   return r.json();
 }).then(function (l) {
@@ -68,7 +69,7 @@ fetch('/api/lote/' + encodeURIComponent(id), { cache: 'no-store' }).then(functio
     + '<div><dt>Entrada</dt><dd>' + esc(l.entrada || '—') + '</dd></div>'
     + '<div><dt>Aparência</dt><dd>' + esc(l.aparencia || '—') + '</dd></div>'
     + '<div><dt>Cheiro</dt><dd>' + esc(l.cheiro || '—') + '</dd></div>'
-    + '<div><dt>Rendimento</dt><dd>cerca de 3 baseados por grama</dd></div>'
+    + '<div><dt>Rendimento</dt><dd>5 g dão 1 baseado</dd></div>'
     + '</dl>'
     + '<a class="botao" href="/#cardapio">Pedir esse lote</a>'
     + '<p class="nota">A ficha descreve o lote em estoque, não uma promessa de efeito. '

@@ -47,6 +47,7 @@ h1{font-family:var(--display);font-size:clamp(28px,8vw,42px);text-transform:uppe
 </div>
 
 <script>
+var API = 'https://api.cabostore.de';
 var PASSOS = ['aguardando pix', 'pix confirmado', 'motoboy chamado', 'a caminho', 'entregue'];
 var params = new URLSearchParams(location.search);
 var codigo = (params.get('c') || '').toUpperCase();
@@ -101,7 +102,9 @@ async function buscar() {
     return;
   }
   try {
-    var r = await fetch('/api/pedido/' + codigo + '?s=' + encodeURIComponent(segredo), { cache: 'no-store' });
+    var r = await fetch(API + '/api/pedido/' + codigo + '?s=' + encodeURIComponent(segredo), {
+      cache: 'no-store', credentials: 'include'
+    });
     if (!r.ok) {
       caixa.className = 'caixa erro';
       caixa.textContent = r.status === 403 ? 'Link inválido ou expirado.' : 'Pedido não encontrado.';

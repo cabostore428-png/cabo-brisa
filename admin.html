@@ -67,6 +67,7 @@ button.sec{background:transparent;color:var(--neon);border:1px solid var(--neon)
 </div>
 
 <script>
+var API = 'https://api.cabostore.de';
 var token = localStorage.getItem('cb-admin') || '';
 
 function esc(t) {
@@ -92,7 +93,7 @@ async function carregar() {
   carregarPedidos();
   carregarConversas();
   try {
-    var e = await (await fetch('/api/estado', { cache: 'no-store' })).json();
+    var e = await (await fetch(API + '/api/estado', { cache: 'no-store' })).json();
     document.getElementById('estMaconha').value = e.maconha;
     document.getElementById('estCocaina').value = e.cocaina;
   } catch (err) {}
@@ -103,7 +104,7 @@ async function salvarEstoque() {
     maconha: Number(document.getElementById('estMaconha').value) || 0,
     cocaina: Number(document.getElementById('estCocaina').value) || 0
   };
-  var r = await fetch('/api/admin/estoque?admin=' + encodeURIComponent(token), {
+  var r = await fetch(API + '/api/admin/estoque?admin=' + encodeURIComponent(token), {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(corpo)
@@ -114,7 +115,7 @@ async function salvarEstoque() {
 async function postarDiario() {
   var texto = document.getElementById('diarioTexto').value.trim();
   if (!texto) return;
-  var r = await fetch('/api/admin/diario?admin=' + encodeURIComponent(token), {
+  var r = await fetch(API + '/api/admin/diario?admin=' + encodeURIComponent(token), {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ texto: texto })
@@ -125,7 +126,7 @@ async function postarDiario() {
 
 async function carregarPedidos() {
   var alvo = document.getElementById('pedidos');
-  var r = await fetch('/api/admin/pedidos?admin=' + encodeURIComponent(token), { cache: 'no-store' });
+  var r = await fetch(API + '/api/admin/pedidos?admin=' + encodeURIComponent(token), { cache: 'no-store' });
   if (!r.ok) { alvo.innerHTML = '<p class="aviso">Sem acesso.</p>'; return; }
   var lista = await r.json();
   if (!lista.length) { alvo.innerHTML = '<p class="aviso">Nenhum pedido.</p>'; return; }
@@ -149,7 +150,7 @@ async function carregarPedidos() {
 }
 
 async function mudarStatus(sel, codigo) {
-  var r = await fetch('/api/admin/status?admin=' + encodeURIComponent(token), {
+  var r = await fetch(API + '/api/admin/status?admin=' + encodeURIComponent(token), {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ codigo: codigo, status: sel.value })
@@ -159,7 +160,7 @@ async function mudarStatus(sel, codigo) {
 
 async function carregarConversas() {
   var alvo = document.getElementById('conversas');
-  var r = await fetch('/api/chat?admin=' + encodeURIComponent(token), { cache: 'no-store' });
+  var r = await fetch(API + '/api/chat?admin=' + encodeURIComponent(token), { cache: 'no-store' });
   if (!r.ok) { alvo.innerHTML = '<p class="aviso">Sem acesso.</p>'; return; }
   var lista = await r.json();
   if (!lista.length) { alvo.innerHTML = '<p class="aviso">Nenhuma conversa.</p>'; return; }
@@ -179,7 +180,7 @@ async function carregarConversas() {
 
 async function abrirConversa(id) {
   var alvo = document.getElementById('msgs-' + id);
-  var r = await fetch('/api/chat/' + id + '?desde=0', { cache: 'no-store' });
+  var r = await fetch(API + '/api/chat/' + id + '?desde=0', { cache: 'no-store' });
   var lista = await r.json();
   var html = '';
   for (var i = 0; i < lista.length; i++) {
@@ -194,7 +195,7 @@ async function responder(id) {
   var texto = campo.value.trim();
   if (!texto) return;
   campo.value = '';
-  await fetch('/api/chat/' + id, {
+  await fetch(API + '/api/chat/' + id, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ texto: texto, de: 'loja' })
