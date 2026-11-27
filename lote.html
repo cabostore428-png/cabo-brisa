@@ -36,9 +36,7 @@ font-size:13px;letter-spacing:.16em;text-transform:uppercase;padding:13px 26px;t
 <div class="topo"><a href="/">← voltar para a loja</a></div>
 <div class="foto" id="foto">🌿</div>
 
-<div class="conteudo" id="conteudo">
-  <h1 id="nome">carregando…</h1>
-</div>
+<div class="conteudo" id="conteudo"><h1 id="nome">carregando…</h1></div>
 
 <script>
 var API = 'https://api.cabostore.de';
@@ -69,7 +67,7 @@ fetch(API + '/api/lote/' + encodeURIComponent(id), { cache: 'no-store' }).then(f
     + '<div><dt>Entrada</dt><dd>' + esc(l.entrada || '—') + '</dd></div>'
     + '<div><dt>Aparência</dt><dd>' + esc(l.aparencia || '—') + '</dd></div>'
     + '<div><dt>Cheiro</dt><dd>' + esc(l.cheiro || '—') + '</dd></div>'
-    + '<div><dt>Rendimento</dt><dd>5 g dão 1 baseado</dd></div>'
+    + '<div><dt>Rendimento</dt><dd>cerca de 5 g por baseado</dd></div>'
     + '</dl>'
     + '<a class="botao" href="/#cardapio">Pedir esse lote</a>'
     + '<p class="nota">A ficha descreve o lote em estoque, não uma promessa de efeito. '

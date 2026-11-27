@@ -828,8 +828,7 @@ footer .miudo { font-family: var(--mono); font-size: 10px; letter-spacing: .22em
           <a class="ficha-link" href="lote.html?id=1">ficha do lote</a>
           <div class="preco-linha">
             <span class="preco-g" id="preco-maconha">R$ 5</span>
-            <span class="preco-antigo" id="antigo-maconha">R$ 12</span>
-            <span class="por-g">por g</span>
+            <span class="por-g">por g · mínimo 5 g</span>
           </div>
           <div class="pedaco">
             <div class="gramas" id="gramas-maconha">
@@ -1081,7 +1080,7 @@ footer .miudo { font-family: var(--mono); font-size: 10px; letter-spacing: .22em
 <footer>
   <blockquote>"A maconha não irá te matar, mas o cigarro irá."<span>Elbert Hubbard</span></blockquote>
   <a class="ig" href="https://www.instagram.com/cabobrisa.delivery/" target="_blank" rel="noopener">@cabobrisa.delivery</a>
-  <p class="miudo">maconha e cocaína · +18 · Cabo Frio · v6</p>
+  <p class="miudo">maconha e cocaína · +18 · Cabo Frio · v7</p>
 </footer>
 
 <button class="chat-botao" onclick="alternarChat()" aria-label="Conversar">✉</button>
@@ -1217,6 +1216,8 @@ footer .miudo { font-family: var(--mono); font-size: 10px; letter-spacing: .22em
   </div>
 </div>
 
+<audio id="ambiente" src="ambiente.mp3" loop preload="none"></audio>
+
 <script>
 var API = 'https://api.cabostore.de';
 function api(caminho, opcoes) {
@@ -1226,7 +1227,6 @@ function api(caminho, opcoes) {
 }
 
 var CHAVE = 'cabo-brisa-carrinho-9';
-var CHAVE_PROMO = 'cb-fim-promo';
 var CHAVE_CUPOM = 'cb-cupom';
 var CHAVE_MEU = 'cb-meu-codigo';
 var CHAVE_AVAL_TRAVA = 'cb-aval-trava';
@@ -1243,7 +1243,7 @@ var INDICACAO_VALOR = 2;
 var NL = String.fromCharCode(10);
 var ALFA = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
 var SAL = 'cabo-brisa-2026';
-var VERSAO = 'v6';
+var VERSAO = 'v7';
 
 var PRODUTOS = {
   maconha: { nome: 'Maconha', min: 5, precoG: function () { return 5; } },
@@ -1257,12 +1257,11 @@ var KITS = {
 
 var ESTOQUE = { maconha: 0, cocaina: 0 };
 var PRE_VENDA = { maconha: true, cocaina: false };
-var MODO = 'pre-venda';
-var remoto = false;
 
 var cart = [];
 var codigoAtual = '';
 var enderecoAtual = '';
+var msgPedido = '';
 var notaAtual = 0;
 var descontoCupom = 0;
 var descontoIndicacao = 0;
@@ -1280,6 +1279,7 @@ var somLigado = true;
 var ctxAudio = null;
 var ganhoMestre = null;
 var ambienteNos = [];
+var elAmbiente = null, usandoArquivo = false, fadeTimer = null;
 
 console.log('Cabo Brisa ' + VERSAO);
 
@@ -1333,8 +1333,39 @@ function clique() {
   o.start(); o.stop(c.currentTime + 0.15);
 }
 
-function ambiente() {
-  if (!somLigado || ambienteNos.length) return;
+function pegarAudio() {
+  if (!elAmbiente) elAmbiente = document.getElementById('ambiente');
+  return elAmbiente;
+}
+
+function fadeArquivo(alvo, ms) {
+  var el = pegarAudio();
+  if (!el) return;
+  clearInterval(fadeTimer);
+  var atual = el.volume, passos = Math.max(1, Math.round(ms / 50));
+  var passo = (alvo - atual) / passos, n = 0;
+  fadeTimer = setInterval(function () {
+    n++;
+    el.volume = Math.min(1, Math.max(0, atual + passo * n));
+    if (n >= passos) clearInterval(fadeTimer);
+  }, 50);
+}
+
+async function ambiente() {
+  if (!somLigado) return;
+
+  var el = pegarAudio();
+  if (el && el.getAttribute('src') && !usandoArquivo) {
+    el.volume = 0;
+    try {
+      await el.play();
+      usandoArquivo = true;
+      fadeArquivo(0.18, 1800);
+      return;
+    } catch (e) { usandoArquivo = false; }
+  }
+
+  if (ambienteNos.length) return;
   var c = audio();
   if (!c) return;
   var base = c.createGain(); base.gain.value = 0.05; base.connect(ganhoMestre);
@@ -1353,17 +1384,14 @@ function ambiente() {
     o.start(); lfo.start();
     ambienteNos.push(o, lfo);
   });
-
-  var sh = c.createOscillator(); sh.type = 'sine'; sh.frequency.value = 880;
-  var shg = c.createGain(); shg.gain.value = 0.01;
-  var shl = c.createOscillator(); shl.frequency.value = 0.07;
-  var shlg = c.createGain(); shlg.gain.value = 0.009;
-  shl.connect(shlg); shlg.connect(shg.gain);
-  sh.connect(shg); shg.connect(base); sh.start(); shl.start();
-  ambienteNos.push(sh, shl);
 }
 
 function pararAmbiente() {
+  var el = pegarAudio();
+  if (usandoArquivo && el) {
+    fadeArquivo(0, 700);
+    setTimeout(function () { if (!somLigado) el.pause(); }, 760);
+  }
   ambienteNos.forEach(function (n) { try { n.stop(); } catch (e) {} });
   ambienteNos = [];
 }
@@ -1378,6 +1406,15 @@ function alternarSom() {
 document.addEventListener('pointerdown', function (e) {
   if (e.target.closest('button, a')) clique();
 }, true);
+
+document.addEventListener('visibilitychange', function () {
+  var el = pegarAudio();
+  if (!el || !usandoArquivo) return;
+  if (document.hidden) el.pause();
+  else if (somLigado) el.play().catch(function () {});
+});
+
+/* ---------- utilidades ---------- */
 
 function soma(s) {
   var h = 5381;
@@ -1402,16 +1439,6 @@ function seloValido(codigo) {
 
 var salvo = ler(CHAVE, []);
 if (Array.isArray(salvo)) cart = salvo;
-
-function fimPromo() {
-  var s = parseInt(localStorage.getItem(CHAVE_PROMO) || '0', 10);
-  if (!s) {
-    s = Date.now() + 14 * 86400000;
-    try { localStorage.setItem(CHAVE_PROMO, String(s)); } catch (e) {}
-  }
-  return s;
-}
-function emPromo() { return Date.now() < fimPromo(); }
 
 function consumo() {
   var c = { maconha: 0, cocaina: 0 };
@@ -1445,7 +1472,6 @@ function sincronizar() {
     if (!d) return;
     ESTOQUE.maconha = Number(d.maconha) || 0;
     ESTOQUE.cocaina = Number(d.cocaina) || 0;
-    remoto = true;
     render();
     pintarVivo();
   }).catch(function () {});
@@ -1455,7 +1481,6 @@ function pintarVivo() {
   var alvo = document.getElementById('vivoTexto');
   if (!alvo) return;
   var g = ESTOQUE.maconha;
-  if (!remoto) { alvo.textContent = 'lote em pré-venda'; return; }
   if (g <= 0) { alvo.textContent = 'lote esgotado · pré-venda aberta'; return; }
   alvo.textContent = 'restam ' + numero(g) + ' g no lote · atualiza sozinho';
 }
@@ -1518,9 +1543,7 @@ function tocarVideo() {
   if (!v) return;
   var p = v.play();
   if (p && p.catch) {
-    p.catch(function () {
-      v.style.display = 'none';
-    });
+    p.catch(function () { v.style.display = 'none'; });
   }
 }
 
@@ -1744,10 +1767,7 @@ function montarPerfil() {
 /* ---------- conta ---------- */
 
 function abrirConta() {
-  if (eu) {
-    document.getElementById('conta').scrollIntoView({ behavior: 'smooth' });
-    return;
-  }
+  if (eu) { document.getElementById('conta').scrollIntoView({ behavior: 'smooth' }); return; }
   document.getElementById('modalConta').classList.add('aberto');
 }
 
@@ -1842,8 +1862,6 @@ async function sairConta() {
   carregarEu();
   carregarRanking();
 }
-
-/* ---------- ranking ---------- */
 
 async function carregarRanking() {
   var alvo = document.getElementById('listaRanking');
@@ -2227,8 +2245,6 @@ async function carregarAval() {
   }
 }
 
-/* ---------- diário ---------- */
-
 async function carregarDiario() {
   var alvo = document.getElementById('listaDiario');
   try {
@@ -2416,6 +2432,17 @@ function finalizar() {
   }
 
   var janela = window.open('', '_blank');
+  if (janela) {
+    try {
+      janela.document.write('<!DOCTYPE html><html><head><meta charset="utf-8">'
+        + '<meta name="viewport" content="width=device-width,initial-scale=1"><title>Abrindo WhatsApp</title>'
+        + '<style>body{margin:0;height:100vh;display:grid;place-items:center;background:#05060C;'
+        + 'color:#B8F04A;font-family:monospace;letter-spacing:.2em;text-transform:uppercase;font-size:12px}</style>'
+        + '</head><body>abrindo whatsapp…</body></html>');
+      janela.document.close();
+    } catch (e) {}
+  }
+
   var cupomUsado = document.getElementById('cupom').value.trim().toUpperCase();
   var cepUsado = document.getElementById('cep').value;
 
@@ -2437,7 +2464,7 @@ function finalizar() {
         alert('Alguém pediu antes e o estoque mudou. Ajustei aí, confere.');
       } else {
         alert(res.d.erro || 'Não deu para registrar o pedido.');
-        if (janela) janela.close();
+        if (janela && !janela.closed) janela.close();
       }
       return;
     }
@@ -2476,23 +2503,24 @@ function finalizar() {
     limpar();
     codigoAtual = d.codigo;
     enderecoAtual = endereco;
+    msgPedido = msg;
 
     var link = 'https://wa.me/' + MEU_WHATS + '?text=' + encodeURIComponent(msg);
-    if (janela) { janela.opener = null; janela.location.href = link; }
-    else window.open(link, '_blank', 'noopener');
+    if (janela && !janela.closed) janela.location.replace(link);
+    else window.location.href = link;
 
     document.getElementById('confirmacao').scrollIntoView({ behavior: 'smooth' });
     sincronizar();
     if (eu) carregarEu();
   }).catch(function () {
-    if (janela) janela.close();
+    if (janela && !janela.closed) janela.close();
     alert('Sem conexão com o servidor.');
   });
 }
 
 function enviarComprovante() {
   if (!codigoAtual) return;
-  var msg = 'Comprovante do pedido ' + codigoAtual + ' — Cabo Brisa' + NL + NL + 'Endereço: ' + enderecoAtual;
+  var msg = msgPedido || ('Comprovante do pedido ' + codigoAtual + ' — Cabo Brisa' + NL + NL + 'Endereço: ' + enderecoAtual);
   window.open('https://wa.me/' + MEU_WHATS + '?text=' + encodeURIComponent(msg), '_blank', 'noopener');
 }
 
@@ -2622,7 +2650,6 @@ document.getElementById('faixaPromo').textContent =
   'pré-venda · reposição a caminho · 5 g por R$ 25 · entrega a combinar';
 
 document.getElementById('preco-maconha').textContent = 'R$ 5';
-document.getElementById('antigo-maconha').style.display = 'none';
 document.getElementById('meuCod').textContent = meuCodigo();
 
 somLigado = ler(CHAVE_SOM, true) !== false;
@@ -2673,3 +2700,4 @@ sincronizar();
 
 </body>
 </html>
+

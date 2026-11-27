@@ -42,9 +42,7 @@ h1{font-family:var(--display);font-size:clamp(28px,8vw,42px);text-transform:uppe
   <p class="sub">atualiza sozinho</p>
 </div>
 
-<div class="caixa" id="caixa">
-  <p class="sub">carregando…</p>
-</div>
+<div class="caixa" id="caixa"><p class="sub">carregando…</p></div>
 
 <script>
 var API = 'https://api.cabostore.de';
@@ -66,8 +64,7 @@ function data(ts) {
 function pintar(p) {
   var cancelado = p.status === 'cancelado';
   var atual = PASSOS.indexOf(p.status);
-  var html = '<span class="codigo">' + esc(p.codigo) + '</span>'
-    + '<p class="status">' + esc(p.status) + '</p>';
+  var html = '<span class="codigo">' + esc(p.codigo) + '</span><p class="status">' + esc(p.status) + '</p>';
 
   if (!cancelado) {
     html += '<div class="trilha">';
@@ -86,8 +83,7 @@ function pintar(p) {
     + '<div class="linha" style="margin-top:12px"><b>pedido feito em</b>' + data(p.criado_em) + '</div>';
 
   if (p.status === 'entregue') {
-    html += '<p style="margin-top:18px;font-size:13px;color:var(--neon)">Entregue. '
-      + '<a href="/#avaliacoes">Avaliar</a></p>';
+    html += '<p style="margin-top:18px;font-size:13px;color:var(--neon)">Entregue. <a href="/#avaliacoes">Avaliar</a></p>';
   }
 
   caixa.innerHTML = html;
@@ -102,9 +98,7 @@ async function buscar() {
     return;
   }
   try {
-    var r = await fetch(API + '/api/pedido/' + codigo + '?s=' + encodeURIComponent(segredo), {
-      cache: 'no-store', credentials: 'include'
-    });
+    var r = await fetch(API + '/api/pedido/' + codigo + '?s=' + encodeURIComponent(segredo), { cache: 'no-store' });
     if (!r.ok) {
       caixa.className = 'caixa erro';
       caixa.textContent = r.status === 403 ? 'Link inválido ou expirado.' : 'Pedido não encontrado.';

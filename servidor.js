@@ -81,6 +81,7 @@ app.use((req, res, next) => {
     res.setHeader('Access-Control-Allow-Credentials', 'true');
     res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
     res.setHeader('Access-Control-Allow-Methods', 'GET,POST,OPTIONS');
+    res.setHeader('Vary', 'Origin');
   }
   if (req.method === 'OPTIONS') return res.sendStatus(204);
   next();
@@ -138,8 +139,8 @@ app.post('/api/cadastro', async (req, res) => {
   if (senha.length < 6) return res.status(400).json({ erro: 'senha curta' });
   if (!limitar('cad' + email, 5, 3600000)) return res.status(429).json({ erro: 'tente depois' });
 
-  const existe = db.prepare('SELECT id FROM usuarios WHERE email = ?').get(email.toLowerCase());
-  if (existe) return res.status(409).json({ erro: 'e-mail já cadastrado' });
+  if (db.prepare('SELECT id FROM usuarios WHERE email = ?').get(email.toLowerCase()))
+    return res.status(409).json({ erro: 'e-mail já cadastrado' });
 
   const hash = await bcrypt.hash(senha, 10);
   const r = db.prepare('INSERT INTO usuarios (nome, zap, email, senha, criado_em) VALUES (?, ?, ?, ?, ?)')
@@ -177,8 +178,7 @@ app.get('/api/eu', (req, res) => {
 });
 
 app.get('/api/estado', (req, res) => {
-  const e = Object.fromEntries(db.prepare('SELECT chave, valor FROM estoque').all().map(r => [r.chave, r.valor]));
-  res.json(e);
+  res.json(Object.fromEntries(db.prepare('SELECT chave, valor FROM estoque').all().map(r => [r.chave, r.valor])));
 });
 
 app.get('/api/lotes', (req, res) => {
@@ -196,15 +196,10 @@ app.get('/api/diario', (req, res) => {
 });
 
 app.get('/api/ranking', (req, res) => {
-  const linhas = db.prepare(`SELECT nome, total_gasto FROM usuarios
-    WHERE total_gasto > 0 ORDER BY total_gasto DESC LIMIT 20`).all();
+  const linhas = db.prepare('SELECT nome, total_gasto FROM usuarios WHERE total_gasto > 0 ORDER BY total_gasto DESC LIMIT 20').all();
   res.json(linhas.map((l, i) => {
-    const partes = l.nome.trim().split(/\s+/);
-    return {
-      pos: i + 1,
-      nome: partes[0] + (partes[1] ? ' ' + partes[1][0] + '.' : ''),
-      total: l.total_gasto
-    };
+    const p = l.nome.trim().split(/\s+/);
+    return { pos: i + 1, nome: p[0] + (p[1] ? ' ' + p[1][0] + '.' : ''), total: l.total_gasto };
   }));
 });
 
@@ -293,7 +288,7 @@ app.post('/api/pedido', (req, res) => {
   db.prepare("UPDATE estoque SET valor = valor - ? WHERE chave = 'maconha'").run(consumido.maconha);
   db.prepare("UPDATE estoque SET valor = valor - ? WHERE chave = 'cocaina'").run(consumido.cocaina);
 
-  notificar('Pedido ' + codigo + '\nR$ ' + total.toFixed(2) + '\n' + endereco);
+  notificar('🧾 <b>Pedido ' + codigo + '</b>\nR$ ' + total.toFixed(2) + '\n' + endereco);
 
   res.json({ codigo, segredo, subtotal, entrega: taxa, desconto, total, zona });
 });
@@ -339,7 +334,7 @@ app.post('/api/chat/:id', (req, res) => {
   if (!texto) return res.status(400).json({ erro: 'vazio' });
   const r = db.prepare('INSERT INTO mensagens (conversa_id, de, texto, criado_em) VALUES (?, ?, ?, ?)')
     .run(req.params.id, de === 'loja' ? 'loja' : 'cliente', texto.slice(0, 500), Date.now());
-  if (de !== 'loja') notificar('Nova mensagem (conversa ' + req.params.id + ')\n' + texto.slice(0, 300));
+  if (de !== 'loja') notificar('💬 <b>Nova mensagem</b> (conversa ' + req.params.id + ')\n' + texto.slice(0, 300));
   res.json({ id: r.lastInsertRowid });
 });
 
