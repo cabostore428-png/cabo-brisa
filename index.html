@@ -1080,7 +1080,7 @@ footer .miudo { font-family: var(--mono); font-size: 10px; letter-spacing: .22em
 <footer>
   <blockquote>"A maconha não irá te matar, mas o cigarro irá."<span>Elbert Hubbard</span></blockquote>
   <a class="ig" href="https://www.instagram.com/cabobrisa.delivery/" target="_blank" rel="noopener">@cabobrisa.delivery</a>
-  <p class="miudo">maconha e cocaína · +18 · Cabo Frio · v7</p>
+  <p class="miudo">maconha e cocaína · +18 · Cabo Frio · v8</p>
 </footer>
 
 <button class="chat-botao" onclick="alternarChat()" aria-label="Conversar">✉</button>
@@ -1243,7 +1243,7 @@ var INDICACAO_VALOR = 2;
 var NL = String.fromCharCode(10);
 var ALFA = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
 var SAL = 'cabo-brisa-2026';
-var VERSAO = 'v7';
+var VERSAO = 'v8';
 
 var PRODUTOS = {
   maconha: { nome: 'Maconha', min: 5, precoG: function () { return 5; } },
@@ -2431,18 +2431,6 @@ function finalizar() {
     else itensEnvio.push({ id: cart[i].id, g: cart[i].g });
   }
 
-  var janela = window.open('', '_blank');
-  if (janela) {
-    try {
-      janela.document.write('<!DOCTYPE html><html><head><meta charset="utf-8">'
-        + '<meta name="viewport" content="width=device-width,initial-scale=1"><title>Abrindo WhatsApp</title>'
-        + '<style>body{margin:0;height:100vh;display:grid;place-items:center;background:#05060C;'
-        + 'color:#B8F04A;font-family:monospace;letter-spacing:.2em;text-transform:uppercase;font-size:12px}</style>'
-        + '</head><body>abrindo whatsapp…</body></html>');
-      janela.document.close();
-    } catch (e) {}
-  }
-
   var cupomUsado = document.getElementById('cupom').value.trim().toUpperCase();
   var cepUsado = document.getElementById('cep').value;
 
@@ -2464,7 +2452,6 @@ function finalizar() {
         alert('Alguém pediu antes e o estoque mudou. Ajustei aí, confere.');
       } else {
         alert(res.d.erro || 'Não deu para registrar o pedido.');
-        if (janela && !janela.closed) janela.close();
       }
       return;
     }
@@ -2493,6 +2480,7 @@ function finalizar() {
     msg += NL + NL + 'CEP: ' + cepUsado;
     msg += NL + 'Endereço: ' + endereco;
     msg += NL + NL + 'Número do pedido: ' + d.codigo;
+    msg += NL + NL + 'Acompanhe por aqui: https://cabostore.de/pedido.html?c=' + d.codigo + '&s=' + d.segredo;
     msg += NL + NL + 'Pago no Pix, envio o comprovante.';
 
     document.getElementById('codigo').textContent = d.codigo;
@@ -2506,14 +2494,12 @@ function finalizar() {
     msgPedido = msg;
 
     var link = 'https://wa.me/' + MEU_WHATS + '?text=' + encodeURIComponent(msg);
-    if (janela && !janela.closed) janela.location.replace(link);
-    else window.location.href = link;
+    var nova = window.open(link, '_blank');
+    if (!nova || nova.closed) window.location.href = link;
 
-    document.getElementById('confirmacao').scrollIntoView({ behavior: 'smooth' });
     sincronizar();
     if (eu) carregarEu();
   }).catch(function () {
-    if (janela && !janela.closed) janela.close();
     alert('Sem conexão com o servidor.');
   });
 }
@@ -2700,4 +2686,3 @@ sincronizar();
 
 </body>
 </html>
-
