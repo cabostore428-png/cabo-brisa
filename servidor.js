@@ -1,382 +1,874 @@
-const express = require('express');
-const Database = require('better-sqlite3');
-const bcrypt = require('bcryptjs');
-const cookie = require('cookie-parser');
-const crypto = require('crypto');
-const path = require('path');
+/* ===== Cabo Brisa — script completo v9 ===== */
 
-const ADMIN = process.env.ADMIN_TOKEN || 'troque-este-token';
-const PORT = process.env.PORT || 3000;
-const DB_PATH = process.env.DB_PATH || 'cabo.db';
+var CHAVE = 'cabo-brisa-carrinho-9';
+var CHAVE_CUPOM = 'cb-cupom';
+var CHAVE_MEU = 'cb-meu-codigo';
+var CHAVE_AVAL = 'cb-avaliacoes';
+var CHAVE_AVAL_TRAVA = 'cb-aval-trava';
+var CHAVE_ESPERA = 'cb-espera';
+var CHAVE_AMOSTRA = 'cb-amostra-usada';
+var CHAVE_PERFIL = 'cb-perfil';
+var CHAVE_CHAT = 'cb-chat';
+var CHAVE_SOM = 'cb-som';
 
-const db = new Database(DB_PATH);
-db.pragma('journal_mode = WAL');
+var MINIMO = 20;
+var GRATIS_ACIMA = 70;
+var MEU_WHATS = '5522981551818';
+var MEU_TELEGRAM = 'cabobrisa';
+var CUPOM_VALOR = 5;
+var INDICACAO_VALOR = 2;
+var NL = String.fromCharCode(10);
 
-db.exec(`
-CREATE TABLE IF NOT EXISTS usuarios (
-  id INTEGER PRIMARY KEY, nome TEXT NOT NULL, zap TEXT NOT NULL,
-  email TEXT NOT NULL UNIQUE, senha TEXT NOT NULL,
-  criado_em INTEGER NOT NULL, total_gasto REAL NOT NULL DEFAULT 0
-);
-CREATE TABLE IF NOT EXISTS sessoes (
-  token TEXT PRIMARY KEY, usuario_id INTEGER NOT NULL, expira INTEGER NOT NULL
-);
-CREATE TABLE IF NOT EXISTS pedidos (
-  id INTEGER PRIMARY KEY, codigo TEXT NOT NULL UNIQUE, segredo TEXT NOT NULL,
-  usuario_id INTEGER, itens TEXT NOT NULL, subtotal REAL NOT NULL,
-  entrega REAL NOT NULL, desconto REAL NOT NULL, total REAL NOT NULL,
-  endereco TEXT NOT NULL, status TEXT NOT NULL, criado_em INTEGER NOT NULL
-);
-CREATE TABLE IF NOT EXISTS avaliacoes (
-  id INTEGER PRIMARY KEY, usuario_id INTEGER, nome TEXT, nota INTEGER NOT NULL,
-  texto TEXT NOT NULL, pedido TEXT, verificado INTEGER NOT NULL DEFAULT 0,
-  criado_em INTEGER NOT NULL
-);
-CREATE TABLE IF NOT EXISTS cupons (
-  codigo TEXT PRIMARY KEY, valor REAL NOT NULL, validade INTEGER NOT NULL, usado INTEGER NOT NULL DEFAULT 0
-);
-CREATE TABLE IF NOT EXISTS estoque (chave TEXT PRIMARY KEY, valor REAL NOT NULL);
-CREATE TABLE IF NOT EXISTS lotes (
-  id INTEGER PRIMARY KEY, nome TEXT NOT NULL, foto TEXT, origem TEXT, entrada TEXT,
-  aparencia TEXT, cheiro TEXT, preco_g REAL NOT NULL, ativo INTEGER NOT NULL DEFAULT 1
-);
-CREATE TABLE IF NOT EXISTS diario (
-  id INTEGER PRIMARY KEY, texto TEXT NOT NULL, criado_em INTEGER NOT NULL
-);
-CREATE TABLE IF NOT EXISTS conversas (
-  id INTEGER PRIMARY KEY, usuario_id INTEGER, aberta_em INTEGER NOT NULL
-);
-CREATE TABLE IF NOT EXISTS mensagens (
-  id INTEGER PRIMARY KEY, conversa_id INTEGER NOT NULL, de TEXT NOT NULL,
-  texto TEXT NOT NULL, criado_em INTEGER NOT NULL
-);
-`);
+var API = /(^|\.)cabostore\.de$/.test(location.hostname) ? 'https://api.cabostore.de' : '';
 
-db.prepare("INSERT OR IGNORE INTO estoque (chave, valor) VALUES ('maconha', 0)").run();
-db.prepare("INSERT OR IGNORE INTO estoque (chave, valor) VALUES ('cocaina', 0)").run();
+var PRODUTOS = {
+  maconha: { nome: 'Prensado', desde: 'lote prensado, 5 g no mínimo', precoG: 5, min: 5, passo: 5, foto: 'lote1.jpg' },
+  cocaina: { nome: 'Cocaína', desde: 'pó, 1 g no mínimo', precoG: 10, min: 1, passo: 1, foto: 'po1.jpg' }
+};
 
-if (!db.prepare('SELECT COUNT(*) c FROM lotes').get().c) {
-  db.prepare(`INSERT INTO lotes (nome, foto, origem, entrada, aparencia, cheiro, preco_g)
-    VALUES (?, ?, ?, ?, ?, ?, ?)`).run(
-    'Prensado do lote 12', 'lote1.jpg', 'Cabo Frio', 'pré-venda',
-    'Bloco compacto, marrom escuro, sem mofo', 'Terra e madeira', 5);
-  db.prepare('INSERT INTO diario (texto, criado_em) VALUES (?, ?)')
-    .run('Reposição a caminho. A pré-venda segue aberta.', Date.now());
-}
+var KITS = {
+  kit1: { nome: 'Kit 10 g', g: 10, preco: 45 },
+  kit2: { nome: 'Kit 20 g', g: 20, preco: 80 }
+};
 
-const PRECOS = { maconha: 5, cocaina: 40 };
-const KITS = { kit1: { preco: 45, maconha: 10 }, kit2: { preco: 80, maconha: 20 } };
-const MINIMO = 20;
-const GRATIS_ACIMA = 70;
-const FRETE = { cabofrio: 5, vizinha: 12, fora: 15 };
+var ESTOQUE = { maconha: 0, cocaina: 0 };
 
-const app = express();
-app.use(express.json());
-app.use(cookie());
+var cart = [];
+var frete = null;
+var zonaFrete = '';
+var descontoCupom = 0;
+var descontoIndicacao = 0;
+var codigoIndicador = '';
+var notaAtual = 0;
+var codigoAtual = '';
+var enderecoAtual = '';
+var remoto = false;
+var conta = null;
+var modoConta = 'entrar';
+var chatId = 0;
+var chatUltimo = 0;
+var chatTimer = null;
+var somLigado = true;
+var audioCtx = null;
+var codigoPendente = '';
+var navegando = false;
 
-app.use((req, res, next) => {
-  const o = req.headers.origin;
-  if (o && /^https:\/\/(www\.)?cabostore\.de$/.test(o)) {
-    res.setHeader('Access-Control-Allow-Origin', o);
-    res.setHeader('Access-Control-Allow-Credentials', 'true');
-    res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
-    res.setHeader('Access-Control-Allow-Methods', 'GET,POST,OPTIONS');
-    res.setHeader('Vary', 'Origin');
-  }
-  if (req.method === 'OPTIONS') return res.sendStatus(204);
-  next();
-});
+function url(p) { return API + p; }
+function esc(t) { return String(t == null ? '' : t).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'); }
+function numero(n) { return String(n).replace('.', ','); }
+function formatar(v) { return 'R$ ' + Number(v || 0).toFixed(2).replace('.', ','); }
+function ler(c, padrao) { try { var v = JSON.parse(localStorage.getItem(c)); return v == null ? padrao : v; } catch (e) { return padrao; } }
+function gravar(c, v) { try { localStorage.setItem(c, JSON.stringify(v)); } catch (e) {} }
 
-app.use(express.static(path.join(__dirname), { extensions: ['html'] }));
+/* ---------- som ---------- */
 
-async function notificar(texto) {
-  const tok = process.env.TELEGRAM_TOKEN, chat = process.env.TELEGRAM_CHAT;
-  if (!tok || !chat) return;
+function tocar(freq, dur, tipo) {
+  if (!somLigado) return;
   try {
-    await fetch('https://api.telegram.org/bot' + tok + '/sendMessage', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ chat_id: chat, text: texto, parse_mode: 'HTML' })
-    });
+    if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    var o = audioCtx.createOscillator(), g = audioCtx.createGain();
+    o.type = tipo || 'triangle';
+    o.frequency.value = freq;
+    g.gain.setValueAtTime(0.06, audioCtx.currentTime);
+    g.gain.exponentialRampToValueAtTime(0.0001, audioCtx.currentTime + dur);
+    o.connect(g); g.connect(audioCtx.destination);
+    o.start(); o.stop(audioCtx.currentTime + dur);
   } catch (e) {}
 }
 
-function usuarioDoReq(req) {
-  const t = req.cookies.cb_sessao;
-  if (!t) return null;
-  const s = db.prepare('SELECT * FROM sessoes WHERE token = ?').get(t);
-  if (!s || s.expira < Date.now()) return null;
-  return db.prepare('SELECT id, nome, zap, email, total_gasto FROM usuarios WHERE id = ?').get(s.usuario_id);
+function somClique() {
+  var base = [520, 610, 470, 690, 560, 640][Math.floor(Math.random() * 6)];
+  tocar(base + Math.random() * 40, 0.08, 'square');
+}
+function somAdicionar() { tocar(440, 0.09); setTimeout(function () { tocar(660, 0.11); }, 70); }
+function somErro() { tocar(220, 0.16, 'sawtooth'); }
+
+function alternarSom() {
+  somLigado = !somLigado;
+  gravar(CHAVE_SOM, somLigado);
+  document.getElementById('btnSom').textContent = somLigado ? 'Som' : 'Mudo';
+  var a = document.getElementById('ambiente');
+  if (somLigado) { a.play().catch(function () {}); tocar(600, 0.1); }
+  else a.pause();
 }
 
-const tentativas = new Map();
-function limitar(chave, max, janela) {
-  const agora = Date.now();
-  const r = tentativas.get(chave) || { n: 0, t: agora };
-  if (agora - r.t > janela) { r.n = 0; r.t = agora; }
-  r.n++;
-  tentativas.set(chave, r);
-  return r.n <= max;
+function iniciarAmbiente() {
+  var a = document.getElementById('ambiente');
+  a.volume = 0;
+  a.play().then(function () {
+    var v = 0;
+    var t = setInterval(function () {
+      v += 0.03;
+      a.volume = Math.min(0.28, v);
+      if (v >= 0.28) clearInterval(t);
+    }, 120);
+  }).catch(function () {});
 }
 
-function entrarComSessao(res, usuario_id) {
-  const token = crypto.randomBytes(32).toString('hex');
-  db.prepare('INSERT INTO sessoes (token, usuario_id, expira) VALUES (?, ?, ?)')
-    .run(token, usuario_id, Date.now() + 30 * 86400000);
-  res.cookie('cb_sessao', token, {
-    httpOnly: true, sameSite: 'lax', secure: !!process.env.HTTPS, maxAge: 30 * 86400000
-  });
-}
+/* ---------- cardápio ---------- */
 
-function exigirAdmin(req, res, next) {
-  if (req.query.admin !== ADMIN) return res.status(403).json({ erro: 'sem acesso' });
-  next();
-}
-
-app.post('/api/cadastro', async (req, res) => {
-  const { nome, zap, email, senha } = req.body || {};
-  if (!nome || !email || !senha) return res.status(400).json({ erro: 'faltou dado' });
-  if (senha.length < 6) return res.status(400).json({ erro: 'senha curta' });
-  if (!limitar('cad' + email, 5, 3600000)) return res.status(429).json({ erro: 'tente depois' });
-
-  if (db.prepare('SELECT id FROM usuarios WHERE email = ?').get(email.toLowerCase()))
-    return res.status(409).json({ erro: 'e-mail já cadastrado' });
-
-  const hash = await bcrypt.hash(senha, 10);
-  const r = db.prepare('INSERT INTO usuarios (nome, zap, email, senha, criado_em) VALUES (?, ?, ?, ?, ?)')
-    .run(nome.trim(), (zap || '').replace(/\D/g, ''), email.toLowerCase(), hash, Date.now());
-
-  entrarComSessao(res, r.lastInsertRowid);
-  res.json({ ok: true });
-});
-
-app.post('/api/entrar', async (req, res) => {
-  const { email, senha } = req.body || {};
-  if (!email || !senha) return res.status(400).json({ erro: 'faltou dado' });
-  if (!limitar('ent' + email, 8, 900000)) return res.status(429).json({ erro: 'muitas tentativas' });
-
-  const u = db.prepare('SELECT * FROM usuarios WHERE email = ?').get(email.toLowerCase());
-  if (!u) return res.status(401).json({ erro: 'e-mail ou senha errados' });
-  if (!await bcrypt.compare(senha, u.senha)) return res.status(401).json({ erro: 'e-mail ou senha errados' });
-
-  entrarComSessao(res, u.id);
-  res.json({ ok: true });
-});
-
-app.post('/api/sair', (req, res) => {
-  const t = req.cookies.cb_sessao;
-  if (t) db.prepare('DELETE FROM sessoes WHERE token = ?').run(t);
-  res.clearCookie('cb_sessao');
-  res.json({ ok: true });
-});
-
-app.get('/api/eu', (req, res) => {
-  const u = usuarioDoReq(req);
-  if (!u) return res.json({ logado: false });
-  const pedidos = db.prepare('SELECT codigo, segredo, total, status, criado_em FROM pedidos WHERE usuario_id = ? ORDER BY id DESC LIMIT 20').all(u.id);
-  res.json({ logado: true, nome: u.nome, total_gasto: u.total_gasto, pedidos });
-});
-
-app.get('/api/estado', (req, res) => {
-  res.json(Object.fromEntries(db.prepare('SELECT chave, valor FROM estoque').all().map(r => [r.chave, r.valor])));
-});
-
-app.get('/api/lotes', (req, res) => {
-  res.json(db.prepare('SELECT * FROM lotes WHERE ativo = 1 ORDER BY id DESC').all());
-});
-
-app.get('/api/lote/:id', (req, res) => {
-  const l = db.prepare('SELECT * FROM lotes WHERE id = ? AND ativo = 1').get(req.params.id);
-  if (!l) return res.status(404).json({ erro: 'lote não encontrado' });
-  res.json(l);
-});
-
-app.get('/api/diario', (req, res) => {
-  res.json(db.prepare('SELECT texto, criado_em FROM diario ORDER BY id DESC LIMIT 30').all());
-});
-
-app.get('/api/ranking', (req, res) => {
-  const linhas = db.prepare('SELECT nome, total_gasto FROM usuarios WHERE total_gasto > 0 ORDER BY total_gasto DESC LIMIT 20').all();
-  res.json(linhas.map((l, i) => {
-    const p = l.nome.trim().split(/\s+/);
-    return { pos: i + 1, nome: p[0] + (p[1] ? ' ' + p[1][0] + '.' : ''), total: l.total_gasto };
-  }));
-});
-
-app.post('/api/cupom', (req, res) => {
-  const usados = db.prepare("SELECT COUNT(*) c FROM cupons WHERE codigo NOT LIKE 'CB-EGG-%'").get().c;
-  if (usados >= 5) return res.json({ esgotado: true });
-
-  const codigo = 'CB-' + crypto.randomBytes(3).toString('hex').toUpperCase();
-  const validade = Date.now() + 60 * 86400000;
-  db.prepare('INSERT INTO cupons (codigo, valor, validade) VALUES (?, 5, ?)').run(codigo, validade);
-  res.json({ codigo, validade });
-});
-
-app.post('/api/cupom/validar', (req, res) => {
-  const codigo = String(req.body.codigo || '').toUpperCase();
-  const c = db.prepare('SELECT * FROM cupons WHERE codigo = ?').get(codigo);
-  if (!c) return res.json({ estado: 'naoexiste' });
-  if (c.usado) return res.json({ estado: 'usado' });
-  if (c.validade < Date.now()) return res.json({ estado: 'vencido' });
-  res.json({ estado: 'ok' });
-});
-
-app.post('/api/cupom/egg', (req, res) => {
-  const chave = String(req.body.chave || '').slice(0, 12).toUpperCase();
-  if (!chave) return res.status(400).json({ erro: 'sem chave' });
-  const codigo = 'CB-EGG-' + chave;
-  if (!db.prepare('SELECT codigo FROM cupons WHERE codigo = ?').get(codigo)) {
-    db.prepare('INSERT INTO cupons (codigo, valor, validade) VALUES (?, 5, ?)')
-      .run(codigo, Date.now() + 60 * 86400000);
+function montarCards() {
+  var alvo = document.getElementById('cards');
+  var html = '';
+  for (var id in PRODUTOS) {
+    var p = PRODUTOS[id];
+    html += '<div class="card">'
+      + '<div class="foto"><img src="' + p.foto + '" alt="' + esc(p.nome) + '" loading="lazy"></div>'
+      + '<div class="corpo">'
+      + '<h3>' + esc(p.nome) + '</h3>'
+      + '<p class="desde">' + esc(p.desde) + '</p>'
+      + '<p class="preco">' + formatar(p.precoG) + ' <span>/ g</span></p>'
+      + '<div class="controles">'
+      + '<input id="q-' + id + '" type="number" min="' + p.min + '" step="' + p.passo + '" value="' + p.min + '">'
+      + '<span class="un">g</span>'
+      + '</div>'
+      + '<button class="botao" onclick="adicionar(\'' + id + '\')">Adicionar</button>'
+      + '<div id="espera-' + id + '" style="margin-top:9px"></div>'
+      + '</div></div>';
   }
-  res.json({ codigo });
-});
+  alvo.innerHTML = html;
 
-function zonaDoCep(cep) {
-  const p = parseInt(String(cep).replace(/\D/g, '').slice(0, 5), 10);
-  if (p >= 28900 && p <= 28929) return { zona: 'Cabo Frio', frete: FRETE.cabofrio };
-  if ([28930, 28940, 28950, 28960].includes(p)) return { zona: 'cidade vizinha', frete: FRETE.vizinha };
-  return { zona: 'fora da área', frete: FRETE.fora };
+  for (var k in PRODUTOS) {
+    var caixa = document.getElementById('espera-' + k);
+    if (!caixa) continue;
+    caixa.innerHTML = '<div class="espera">'
+      + '<input id="zap-' + k + '" inputmode="tel" maxlength="16" placeholder="WhatsApp se faltar">'
+      + '<button class="botao secundario" style="width:auto;padding:9px 13px;font-size:10px" onclick="avisar(\'' + k + '\')">Avisar</button>'
+      + '</div>';
+  }
 }
 
-app.post('/api/pedido', (req, res) => {
-  const { itens, amostra, cep, endereco, cupom } = req.body || {};
-  if (!Array.isArray(itens) || !itens.length) return res.status(400).json({ erro: 'carrinho vazio' });
-  if (!endereco) return res.status(400).json({ erro: 'sem endereço' });
+function montarKits() {
+  var alvo = document.getElementById('kits');
+  var html = '';
+  for (var k in KITS) {
+    html += '<div class="kit">'
+      + '<p class="nome">' + esc(KITS[k].nome) + '</p>'
+      + '<p class="valor">' + formatar(KITS[k].preco) + '</p>'
+      + '<p class="eco">sai a ' + formatar(KITS[k].preco / KITS[k].g) + ' o grama</p>'
+      + '<button class="botao secundario" onclick="adicionarKit(\'' + k + '\')">Levar</button>'
+      + '</div>';
+  }
+  alvo.innerHTML = html;
+}
 
-  const disp = Object.fromEntries(db.prepare('SELECT chave, valor FROM estoque').all().map(r => [r.chave, r.valor]));
-  const consumido = { maconha: 0, cocaina: 0 };
-  let subtotal = 0;
+/* ---------- carrinho ---------- */
 
-  for (const it of itens) {
-    if (it.kit && KITS[it.kit]) {
-      subtotal += KITS[it.kit].preco;
-      consumido.maconha += KITS[it.kit].maconha;
-    } else if (PRECOS[it.id] && it.g > 0) {
-      subtotal += it.g * PRECOS[it.id];
-      consumido[it.id] += it.g;
+function carregar() {
+  var c = ler(CHAVE, []);
+  cart = Array.isArray(c) ? c : [];
+}
+
+function salvar() { gravar(CHAVE, cart); }
+
+function alternarCarrinho() {
+  document.getElementById('carrinho').classList.toggle('aberta');
+  somClique();
+}
+
+function adicionar(id) {
+  var p = PRODUTOS[id];
+  var campo = document.getElementById('q-' + id);
+  var g = Math.max(p.min, Number(campo.value) || p.min);
+
+  for (var i = 0; i < cart.length; i++) {
+    if (cart[i].id === id && !cart[i].brinde && !cart[i].kit) {
+      cart[i].g += g; somAdicionar(); salvar(); render(); return;
     }
   }
-  if (amostra) consumido.maconha += 1;
+  cart.push({ id: id, g: g });
+  somAdicionar(); salvar(); render();
+}
 
-  if (consumido.maconha > disp.maconha) return res.status(409).json({ erro: 'estoque de maconha mudou', ...disp });
-  if (consumido.cocaina > disp.cocaina) return res.status(409).json({ erro: 'estoque de cocaina mudou', ...disp });
-  if (!amostra && subtotal < MINIMO) return res.status(400).json({ erro: 'abaixo do mínimo' });
+function adicionarKit(k) {
+  cart.push({ id: 'maconha', kit: k, g: KITS[k].g });
+  somAdicionar(); salvar(); render();
+}
 
-  const { zona, frete } = zonaDoCep(cep);
-  const gratis = subtotal >= GRATIS_ACIMA;
-  const taxa = gratis ? 0 : frete;
+function remover(i) {
+  cart.splice(i, 1);
+  somClique(); salvar(); render();
+}
 
-  let desconto = 0;
-  if (cupom) {
-    const c = db.prepare('SELECT * FROM cupons WHERE codigo = ? AND usado = 0 AND validade > ?').get(cupom, Date.now());
-    if (c) { desconto = c.valor; db.prepare('UPDATE cupons SET usado = 1 WHERE codigo = ?').run(cupom); }
+function subtotalAtual() {
+  var s = 0;
+  for (var i = 0; i < cart.length; i++) {
+    var it = cart[i];
+    if (it.brinde) continue;
+    if (it.kit && KITS[it.kit]) s += KITS[it.kit].preco;
+    else s += it.g * PRODUTOS[it.id].precoG;
   }
-  desconto = Math.min(desconto, subtotal + taxa);
-  const total = Math.max(0, subtotal + taxa - desconto);
+  return s;
+}
 
-  const codigo = crypto.randomBytes(2).toString('hex').toUpperCase().slice(0, 3) + Math.floor(10 + Math.random() * 89);
-  const segredo = crypto.randomBytes(3).toString('hex');
-  const u = usuarioDoReq(req);
+function temBrinde() {
+  for (var i = 0; i < cart.length; i++) if (cart[i].brinde) return true;
+  return false;
+}
 
-  db.prepare(`INSERT INTO pedidos (codigo, segredo, usuario_id, itens, subtotal, entrega, desconto, total, endereco, status, criado_em)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'aguardando pix', ?)`).run(
-    codigo, segredo, u ? u.id : null, JSON.stringify({ itens, amostra }), subtotal, taxa, desconto, total,
-    JSON.stringify({ endereco, zona }), Date.now());
-
-  db.prepare("UPDATE estoque SET valor = valor - ? WHERE chave = 'maconha'").run(consumido.maconha);
-  db.prepare("UPDATE estoque SET valor = valor - ? WHERE chave = 'cocaina'").run(consumido.cocaina);
-
-  notificar('🧾 <b>Pedido ' + codigo + '</b>\nR$ ' + total.toFixed(2) + '\n' + endereco);
-
-  res.json({ codigo, segredo, subtotal, entrega: taxa, desconto, total, zona });
-});
-
-app.get('/api/pedido/:codigo', (req, res) => {
-  const p = db.prepare('SELECT codigo, segredo, itens, total, endereco, status, criado_em FROM pedidos WHERE codigo = ?').get(req.params.codigo.toUpperCase());
-  if (!p) return res.status(404).json({ erro: 'não achei' });
-  if (p.segredo !== req.query.s && !usuarioDoReq(req)) return res.status(403).json({ erro: 'link inválido' });
-  res.json(p);
-});
-
-app.get('/api/avaliacoes', (req, res) => {
-  res.json(db.prepare('SELECT nome, nota, texto, verificado, criado_em FROM avaliacoes ORDER BY id DESC LIMIT 40').all());
-});
-
-app.post('/api/avaliacoes', (req, res) => {
-  const { nota, texto, pedido } = req.body || {};
-  if (!nota || !texto) return res.status(400).json({ erro: 'faltou dado' });
-  const u = usuarioDoReq(req);
-  const verificado = !!(pedido && db.prepare('SELECT 1 FROM pedidos WHERE codigo = ?').get(String(pedido).toUpperCase()));
-  db.prepare('INSERT INTO avaliacoes (usuario_id, nome, nota, texto, pedido, verificado, criado_em) VALUES (?, ?, ?, ?, ?, ?, ?)')
-    .run(u ? u.id : null, u ? u.nome.split(' ')[0] : null, nota, texto.slice(0, 240), pedido || null, verificado ? 1 : 0, Date.now());
-  res.json({ ok: true, verificado });
-});
-
-app.post('/api/chat/abrir', (req, res) => {
-  const u = usuarioDoReq(req);
-  if (u) {
-    const aberta = db.prepare('SELECT id FROM conversas WHERE usuario_id = ? ORDER BY id DESC LIMIT 1').get(u.id);
-    if (aberta) return res.json({ id: aberta.id });
+function consumo() {
+  var m = 0, c = 0;
+  for (var i = 0; i < cart.length; i++) {
+    if (cart[i].id === 'maconha') m += cart[i].g;
+    if (cart[i].id === 'cocaina') c += cart[i].g;
   }
-  const r = db.prepare('INSERT INTO conversas (usuario_id, aberta_em) VALUES (?, ?)').run(u ? u.id : null, Date.now());
-  res.json({ id: r.lastInsertRowid });
-});
+  return { maconha: m, cocaina: c };
+}
 
-app.get('/api/chat/:id', (req, res) => {
-  res.json(db.prepare('SELECT de, texto, criado_em FROM mensagens WHERE conversa_id = ? AND id > ? ORDER BY id')
-    .all(req.params.id, Number(req.query.desde) || 0));
-});
+function limpar() {
+  cart = [];
+  descontoCupom = 0;
+  descontoIndicacao = 0;
+  codigoIndicador = '';
+  codigoPendente = '';
+  var cup = document.getElementById('cupom');
+  if (cup) cup.value = '';
+  salvar(); render();
+}
 
-app.post('/api/chat/:id', (req, res) => {
-  const { texto, de } = req.body || {};
-  if (!texto) return res.status(400).json({ erro: 'vazio' });
-  const r = db.prepare('INSERT INTO mensagens (conversa_id, de, texto, criado_em) VALUES (?, ?, ?, ?)')
-    .run(req.params.id, de === 'loja' ? 'loja' : 'cliente', texto.slice(0, 500), Date.now());
-  if (de !== 'loja') notificar('💬 <b>Nova mensagem</b> (conversa ' + req.params.id + ')\n' + texto.slice(0, 300));
-  res.json({ id: r.lastInsertRowid });
-});
+function render() {
+  var alvo = document.getElementById('itens');
+  var html = '';
+  for (var i = 0; i < cart.length; i++) {
+    var it = cart[i], nome, preco;
+    if (it.brinde) { nome = it.g + ' g de ' + PRODUTOS[it.id].nome + ' (amostra)'; preco = 'grátis'; }
+    else if (it.kit && KITS[it.kit]) { nome = KITS[it.kit].nome; preco = formatar(KITS[it.kit].preco); }
+    else { nome = it.g + ' g de ' + PRODUTOS[it.id].nome; preco = formatar(it.g * PRODUTOS[it.id].precoG); }
 
-app.get('/api/chat', exigirAdmin, (req, res) => {
-  res.json(db.prepare(`SELECT c.id, c.aberta_em,
-    (SELECT texto FROM mensagens WHERE conversa_id = c.id ORDER BY id DESC LIMIT 1) ultima
-    FROM conversas c ORDER BY c.id DESC LIMIT 50`).all());
-});
-
-app.post('/api/admin/estoque', exigirAdmin, (req, res) => {
-  for (const k of ['maconha', 'cocaina']) {
-    if (typeof req.body[k] === 'number') db.prepare('UPDATE estoque SET valor = ? WHERE chave = ?').run(req.body[k], k);
+    html += '<div class="item"><span class="nome">' + esc(nome) + '</span>'
+      + '<span class="preco">' + preco + '</span>'
+      + '<button onclick="remover(' + i + ')" aria-label="remover">✕</button></div>';
   }
-  res.json({ ok: true });
-});
+  alvo.innerHTML = html;
 
-app.get('/api/admin/pedidos', exigirAdmin, (req, res) => {
-  res.json(db.prepare('SELECT codigo, status, total, endereco, criado_em FROM pedidos ORDER BY id DESC LIMIT 60').all());
-});
+  var subtotal = subtotalAtual();
+  var gratis = subtotal >= GRATIS_ACIMA;
+  var taxa = gratis ? 0 : (frete || 0);
+  var base = subtotal + taxa;
+  var desc = Math.min(descontoCupom + descontoIndicacao, base);
+  var total = Math.max(0, base - desc);
 
-app.post('/api/admin/status', exigirAdmin, (req, res) => {
-  const p = db.prepare('SELECT usuario_id, total, status FROM pedidos WHERE codigo = ?').get(req.body.codigo);
-  if (!p) return res.status(404).json({ erro: 'pedido não existe' });
-  db.prepare('UPDATE pedidos SET status = ? WHERE codigo = ?').run(req.body.status, req.body.codigo);
-  if (req.body.status === 'entregue' && p.status !== 'entregue' && p.usuario_id) {
-    db.prepare('UPDATE usuarios SET total_gasto = total_gasto + ? WHERE id = ?').run(p.total, p.usuario_id);
+  document.getElementById('subtotal').textContent = formatar(subtotal);
+  document.getElementById('entrega').textContent = gratis ? 'grátis' : (frete === null ? '—' : formatar(taxa));
+  document.getElementById('total').textContent = formatar(total);
+  document.getElementById('contador').textContent = cart.length;
+  document.getElementById('vazio').style.display = cart.length ? 'none' : 'block';
+  document.getElementById('linhaDesconto').style.display = desc > 0 ? 'flex' : 'none';
+  document.getElementById('desconto').textContent = '- ' + formatar(desc);
+
+  atualizarLinks();
+}
+
+function calcularFrete() {
+  var cep = document.getElementById('cep').value.replace(/\D/g, '');
+  var msg = document.getElementById('freteMsg');
+
+  if (cep.length !== 8) { msg.textContent = 'CEP com 8 dígitos.'; somErro(); return; }
+
+  var p = Number(cep.slice(0, 5));
+  if (p >= 28900 && p <= 28929) { zonaFrete = 'Cabo Frio'; frete = 5; }
+  else if (p >= 28930 && p <= 28949) { zonaFrete = 'Cabo Frio (interior)'; frete = 8; }
+  else if (p >= 28950 && p <= 28959) { zonaFrete = 'Armação dos Búzios'; frete = 12; }
+  else { zonaFrete = ''; frete = null; }
+
+  if (frete === null) { msg.textContent = 'Fora da área de entrega.'; somErro(); }
+  else { msg.textContent = zonaFrete + ' · entrega ' + formatar(frete); tocar(700, 0.09); }
+
+  render();
+}
+
+/* ---------- cupom e indicação ---------- */
+
+function aplicarCupom() {
+  var campo = document.getElementById('cupom');
+  var v = campo.value.trim().toUpperCase();
+  if (!v) return;
+
+  if (v === meuCodigo()) { somErro(); return; }
+
+  fetch(url('/api/cupom/' + encodeURIComponent(v)), { cache: 'no-store' })
+    .then(function (r) { return r.ok ? r.json() : null; })
+    .then(function (d) {
+      if (d && d.valido) { descontoCupom = CUPOM_VALOR; tocar(760, 0.12); }
+      else { descontoCupom = 0; somErro(); }
+      render();
+    })
+    .catch(function () { descontoCupom = CUPOM_VALOR; render(); });
+}
+
+function aplicarIndicacao() {
+  var campo = document.getElementById('indicacao');
+  var v = campo.value.trim().toUpperCase();
+  if (!v || v === meuCodigo()) { somErro(); return; }
+  descontoIndicacao = INDICACAO_VALOR;
+  codigoIndicador = v;
+  tocar(680, 0.1);
+  render();
+}
+
+/* ---------- amostra ---------- */
+
+function marcarAmostra(ligado) {
+  var usada = ler(CHAVE_AMOSTRA, false);
+  if (usada && ligado) { document.getElementById('amostraCheck').checked = false; return; }
+
+  if (ligado) {
+    if (!temBrinde()) cart.push({ id: 'maconha', g: 1, brinde: true });
+    tocar(820, 0.1);
+  } else {
+    for (var i = 0; i < cart.length; i++) if (cart[i].brinde) { cart.splice(i, 1); break; }
+    somClique();
   }
-  res.json({ ok: true });
+  salvar(); render();
+}
+
+function atualizarAmostra() {
+  var usada = ler(CHAVE_AMOSTRA, false);
+  var check = document.getElementById('amostraCheck');
+  var estado = document.getElementById('amostraEstado');
+  if (usada) {
+    check.checked = false;
+    check.disabled = true;
+    estado.innerHTML = '<p class="usada">Você já usou a amostra. <button class="liberar" onclick="liberarAmostra()">liberar</button></p>';
+  } else {
+    check.disabled = false;
+    estado.innerHTML = '';
+  }
+}
+
+function liberarAmostra() {
+  gravar(CHAVE_AMOSTRA, false);
+  atualizarAmostra();
+}
+
+/* ---------- baseados ---------- */
+
+function calcularBaseado() {
+  var g = Number(document.getElementById('calcG').value) || 0;
+  document.getElementById('calcSaida').textContent = Math.floor(g / 5);
+}
+
+/* ---------- perfil ---------- */
+
+function montarPerfil() {
+  var p = ler(CHAVE_PERFIL, {});
+  document.getElementById('pNome').value = p.nome || '';
+  document.getElementById('pZap').value = p.zap || '';
+  document.getElementById('perfil').classList.add('mostrar');
+}
+
+function salvarPerfil() {
+  var z = document.getElementById('pZap');
+  mascaraZap(z);
+  gravar(CHAVE_PERFIL, {
+    nome: document.getElementById('pNome').value.trim(),
+    zap: z.value.trim()
+  });
+  atualizarLinks();
+}
+
+function mascaraZap(el) {
+  var v = el.value.replace(/\D/g, '').slice(0, 11);
+  el.value = v.length > 6 ? '(' + v.slice(0, 2) + ') ' + v.slice(2, 7) + '-' + v.slice(7) : v;
+}
+
+/* ---------- ranking ---------- */
+
+function carregarRanking() {
+  fetch(url('/api/ranking'), { cache: 'no-store' })
+    .then(function (r) { return r.ok ? r.json() : []; })
+    .then(function (lista) {
+      var alvo = document.getElementById('listaRanking');
+      if (!Array.isArray(lista) || !lista.length) { alvo.innerHTML = '<p class="rank-vazio">Ninguém no ranking ainda.</p>'; return; }
+      var html = '';
+      for (var i = 0; i < lista.length; i++) {
+        html += '<div class="rank-item"><span class="pos">' + (i + 1) + '</span>'
+          + '<span>' + esc(lista[i].nome) + '</span><span class="g">' + lista[i].g + ' g</span></div>';
+      }
+      alvo.innerHTML = html;
+    }).catch(function () {});
+}
+
+/* ---------- diário ---------- */
+
+function carregarDiario() {
+  fetch(url('/api/diario'), { cache: 'no-store' })
+    .then(function (r) { return r.ok ? r.json() : []; })
+    .then(function (lista) {
+      var alvo = document.getElementById('listaDiario');
+      if (!Array.isArray(lista) || !lista.length) { alvo.innerHTML = '<p class="rank-vazio">Nada registrado ainda.</p>'; return; }
+      var html = '';
+      for (var i = 0; i < lista.length; i++) {
+        html += '<div class="diario-item"><span class="quando">' + esc(lista[i].quando || '') + '</span>'
+          + '<p>' + esc(lista[i].texto) + '</p></div>';
+      }
+      alvo.innerHTML = html;
+    }).catch(function () {});
+}
+
+/* ---------- avaliações ---------- */
+
+function nota(n) {
+  notaAtual = n;
+  var b = document.getElementById('estrelas').querySelectorAll('button');
+  for (var i = 0; i < b.length; i++) b[i].className = i < n ? 'on' : '';
+  somClique();
+}
+
+function enviarAval() {
+  var texto = document.getElementById('comentario').value.trim();
+  var pedido = document.getElementById('pedidoAval').value.trim().toUpperCase();
+  if (!notaAtual) { alert('Escolha uma nota.'); return; }
+  if (texto.length < 3) { alert('Escreva um comentário.'); return; }
+
+  var trava = parseInt(localStorage.getItem(CHAVE_AVAL_TRAVA) || '0', 10);
+  if (Date.now() - trava < 30000) { alert('Espere 30 segundos entre uma avaliação e outra.'); return; }
+
+  var lista = ler(CHAVE_AVAL, []);
+  if (!Array.isArray(lista)) lista = [];
+  lista.unshift({ n: notaAtual, t: texto, d: Date.now() });
+  gravar(CHAVE_AVAL, lista.slice(0, 40));
+  try { localStorage.setItem(CHAVE_AVAL_TRAVA, String(Date.now())); } catch (e) {}
+
+  fetch(url('/api/avaliacoes'), {
+    method: 'POST', credentials: 'include',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ nota: notaAtual, texto: texto, pedido: pedido })
+  }).catch(function () {});
+
+  document.getElementById('comentario').value = '';
+  document.getElementById('pedidoAval').value = '';
+  notaAtual = 0;
+  nota(0);
+  tocar(800, 0.14);
+  carregarAval();
+}
+
+function pintarAval(lista) {
+  var alvo = document.getElementById('listaAval');
+  if (!Array.isArray(lista) || !lista.length) { alvo.innerHTML = '<p class="rank-vazio">Sem avaliações ainda.</p>'; return; }
+  var html = '';
+  for (var i = 0; i < lista.length; i++) {
+    var a = lista[i];
+    html += '<div class="aval"><span class="quem">' + esc(a.nome || 'Cliente') + '</span> '
+      + (a.verificado ? '<span class="selo">compra verificada</span>' : '')
+      + '<p>' + esc(a.texto) + '</p></div>';
+  }
+  alvo.innerHTML = html;
+}
+
+function carregarAval() {
+  fetch(url('/api/avaliacoes'), { cache: 'no-store' })
+    .then(function (r) { return r.ok ? r.json() : []; })
+    .then(function (lista) {
+      if (Array.isArray(lista) && lista.length) pintarAval(lista);
+      else document.getElementById('listaAval').innerHTML = '<p class="rank-vazio">Sem avaliações ainda.</p>';
+    }).catch(function () {});
+}
+
+/* ---------- lista de espera ---------- */
+
+function avisar(id) {
+  var campo = document.getElementById('zap-' + id);
+  var caixa = document.getElementById('espera-' + id);
+  var zap = (campo.value || '').replace(/\D/g, '');
+  if (zap.length < 10) { campo.style.borderColor = 'var(--coral)'; campo.focus(); return; }
+
+  var msg = 'Quero ser avisado quando ' + PRODUTOS[id].nome + ' voltar ao estoque na Cabo Brisa.'
+    + NL + NL + 'Meu WhatsApp: ' + zap;
+  window.location.href = 'https://wa.me/' + MEU_WHATS + '?text=' + encodeURIComponent(msg);
+
+  var lista = ler(CHAVE_ESPERA, []);
+  if (!Array.isArray(lista)) lista = [];
+  if (lista.indexOf(id) < 0) { lista.push(id); gravar(CHAVE_ESPERA, lista); }
+  caixa.innerHTML = '<span class="ok">Anotado. Te chamo quando chegar.</span>';
+}
+
+function restaurarEspera() {
+  var lista = ler(CHAVE_ESPERA, []);
+  if (!Array.isArray(lista)) return;
+  for (var i = 0; i < lista.length; i++) {
+    var c = document.getElementById('espera-' + lista[i]);
+    if (c) c.innerHTML = '<span class="ok">Você já está na lista.</span>';
+  }
+}
+
+/* ---------- pedido ---------- */
+
+function gerarCodigo() {
+  var l = 'ABCDEFGHJKLMNPQRSTUVWXYZ', n = '23456789', a = '';
+  for (var i = 0; i < 3; i++) a += l.charAt(Math.floor(Math.random() * l.length));
+  for (var j = 0; j < 2; j++) a += n.charAt(Math.floor(Math.random() * n.length));
+  return a;
+}
+
+function dadosEntrega() {
+  return {
+    rua: document.getElementById('rua').value.trim(),
+    numero: document.getElementById('numero').value.trim(),
+    bairro: document.getElementById('bairro').value.trim(),
+    complemento: document.getElementById('complemento').value.trim(),
+    referencia: document.getElementById('referencia').value.trim()
+  };
+}
+
+function enderecoTexto() {
+  var d = dadosEntrega();
+  var e = d.rua + ', ' + d.numero;
+  if (d.complemento) e += ' — ' + d.complemento;
+  e += ' · ' + d.bairro;
+  if (d.referencia) e += ' · ref.: ' + d.referencia;
+  return e;
+}
+
+function linhaItem(it) {
+  if (it.brinde) return '• ' + numero(it.g) + ' g de ' + PRODUTOS[it.id].nome + ' — AMOSTRA GRÁTIS (primeira compra)';
+  if (it.kit && KITS[it.kit]) return '• ' + KITS[it.kit].nome + ' — ' + formatar(KITS[it.kit].preco);
+  return '• ' + numero(it.g) + ' g de ' + PRODUTOS[it.id].nome + ' — ' + formatar(it.g * PRODUTOS[it.id].precoG);
+}
+
+function textoPedido(codigo) {
+  var subtotal = subtotalAtual();
+  var gratis = subtotal >= GRATIS_ACIMA;
+  var taxa = gratis ? 0 : (frete || 0);
+  var base = subtotal + taxa;
+  var desc = Math.min(descontoCupom + descontoIndicacao, base);
+  var total = Math.max(0, base - desc);
+
+  var l = ['*Cabo Brisa* — pedido ' + codigo, ''];
+  for (var j = 0; j < cart.length; j++) l.push(linhaItem(cart[j]));
+  l.push('');
+  l.push('Produtos: ' + formatar(subtotal));
+  l.push('Entrega: ' + (gratis ? 'grátis' : formatar(taxa)));
+  if (desc > 0) l.push('Desconto: - ' + formatar(desc));
+  l.push('*Total: ' + formatar(total) + '*');
+  if (codigoIndicador) l.push('Indicado por: ' + codigoIndicador);
+  l.push('');
+  l.push('CEP: ' + document.getElementById('cep').value);
+  l.push('Endereço: ' + enderecoTexto());
+  l.push('');
+  l.push('Pago no Pix, envio o comprovante.');
+  l.push('Acompanhar: cabostore.de/pedido.html?t=' + codigo);
+  return l.join(NL);
+}
+
+function atualizarLinks() {
+  if (navegando) return;
+  var aWa = document.getElementById('btnWhats');
+  var aTg = document.getElementById('btnTelegram');
+  if (!aWa || !aTg) return;
+
+  if (!cart.length) {
+    codigoPendente = '';
+    aWa.setAttribute('href', '#');
+    aTg.setAttribute('href', '#');
+    return;
+  }
+  if (!codigoPendente) codigoPendente = gerarCodigo();
+
+  var enc = encodeURIComponent(textoPedido(codigoPendente));
+  aWa.setAttribute('href', 'https://wa.me/' + MEU_WHATS + '?text=' + enc);
+  aTg.setAttribute('href', 'https://t.me/' + MEU_TELEGRAM + '?text=' + enc);
+}
+
+function validarPedido() {
+  if (!cart.length) { alert('Seu pedido está vazio.'); somErro(); return false; }
+
+  var subtotal = subtotalAtual();
+  if (!temBrinde() && subtotal < MINIMO) {
+    alert('O pedido mínimo é de ' + formatar(MINIMO) + ' em produto. Faltam ' + formatar(MINIMO - subtotal)
+      + '. Se for sua primeira compra, marca a amostra grátis de 1 g que aí você paga só a entrega.');
+    somErro(); return false;
+  }
+  if (subtotal < GRATIS_ACIMA && frete === null) {
+    alert('Calcule a entrega pelo CEP antes de enviar.');
+    document.getElementById('cep').focus(); somErro(); return false;
+  }
+
+  var d = dadosEntrega();
+  if (!d.rua || !d.numero || !d.bairro) {
+    alert('Preencha rua, número e bairro.');
+    document.getElementById(!d.rua ? 'rua' : !d.numero ? 'numero' : 'bairro').focus();
+    somErro(); return false;
+  }
+  return true;
+}
+
+function cliqueCheckout(ev) {
+  var a = ev.currentTarget;
+  if (a.getAttribute('href') === '#' || !cart.length) { ev.preventDefault(); validarPedido(); return; }
+  if (!validarPedido()) { ev.preventDefault(); return; }
+  confirmarPedido();
+  /* sem preventDefault: a âncora navega sozinha */
+}
+
+function confirmarPedido() {
+  var codigo = codigoPendente;
+  var endereco = enderecoTexto();
+  var temAmostra = temBrinde();
+  var cons = consumo();
+  var cupomUsado = document.getElementById('cupom').value.trim().toUpperCase();
+  var indicador = codigoIndicador;
+  var cepUsado = document.getElementById('cep').value;
+  var totalFinal = subtotalAtual();
+
+  codigoAtual = codigo;
+  enderecoAtual = endereco;
+  navegando = true;
+
+  document.getElementById('codigo').textContent = codigo;
+  document.getElementById('confirmacao').classList.add('mostrar');
+
+  document.getElementById('btnComprovante').setAttribute('href',
+    'https://wa.me/' + MEU_WHATS + '?text=' +
+    encodeURIComponent('Comprovante do pedido ' + codigo + NL + 'Segue o print do Pix.'));
+
+  if (temAmostra) gravar(CHAVE_AMOSTRA, true);
+  limpar();
+  atualizarAmostra();
+
+  if (descontoCupom > 0 && remoto && cupomUsado) {
+    fetch(url('/api/cupom/usar'), {
+      method: 'POST', credentials: 'include',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ codigo: cupomUsado })
+    }).catch(function () {});
+  }
+
+  document.getElementById('confirmacao').scrollIntoView({ behavior: 'smooth' });
+  tocar(700, 0.12);
+
+  if (remoto) {
+    fetch(url('/api/pedido'), {
+      method: 'POST', credentials: 'include',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        maconha: cons.maconha, cocaina: cons.cocaina, amostra: temAmostra,
+        endereco: endereco, cep: cepUsado, cupom: cupomUsado,
+        indicacao: indicador, total: totalFinal
+      })
+    }).then(function (r) {
+      if (r.status === 409) {
+        return r.json().then(function (d) {
+          ESTOQUE.maconha = Number(d.maconha) || 0;
+          ESTOQUE.cocaina = Number(d.cocaina) || 0;
+          render();
+          alert('Alguém pediu antes e o estoque mudou. Confere o carrinho.');
+        });
+      }
+    }).catch(function () {});
+  }
+
+  setTimeout(function () { navegando = false; }, 3000);
+}
+
+function copiarEntrega() {
+  var msg = document.getElementById('confMsg');
+  var texto = 'Entrega Cabo Brisa' + NL + NL + 'Endereço: ' + enderecoAtual + NL + 'Pedido: ' + codigoAtual
+    + NL + NL + 'Confira o número na porta antes de entregar. O motorista não espera.';
+
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(texto).then(function () {
+      msg.textContent = 'Endereço copiado. Cola no 99.';
+    }).catch(function () { msg.textContent = texto; });
+  } else {
+    msg.textContent = texto;
+  }
+}
+
+/* ---------- conta ---------- */
+
+function meuCodigo() {
+  var c = ler(CHAVE_MEU, '');
+  if (c) return c;
+  var n = 'CB' + Math.floor(1000 + Math.random() * 9000);
+  gravar(CHAVE_MEU, n);
+  return n;
+}
+
+function linkIndicacao() { return location.origin + '/?ref=' + meuCodigo(); }
+
+function copiarLink() {
+  var msg = document.getElementById('msgInd');
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(linkIndicacao()).then(function () {
+      msg.textContent = 'Link copiado.';
+    }).catch(function () { msg.textContent = linkIndicacao(); });
+  } else msg.textContent = linkIndicacao();
+}
+
+function compartilhar() {
+  var t = 'Pega aí na Cabo Brisa, entrega na porta em Cabo Frio. Usa meu código '
+    + meuCodigo() + ' e ganha R$ 2: ' + linkIndicacao();
+  window.location.href = 'https://wa.me/?text=' + encodeURIComponent(t);
+}
+
+function abrirConta() {
+  document.getElementById('modalConta').classList.add('aberto');
+  somClique();
+}
+
+function fecharConta() {
+  document.getElementById('modalConta').classList.remove('aberto');
+}
+
+function trocarModo() {
+  modoConta = modoConta === 'entrar' ? 'criar' : 'entrar';
+  document.getElementById('modalTitulo').textContent = modoConta === 'criar' ? 'Criar conta' : 'Entrar';
+  document.getElementById('btnEntrar').textContent = modoConta === 'criar' ? 'Criar' : 'Entrar';
+  document.getElementById('btnTroca').textContent = modoConta === 'criar' ? 'Já tenho conta' : 'Criar conta';
+  document.getElementById('camposExtra').style.display = modoConta === 'criar' ? 'block' : 'none';
+}
+
+function entrar() {
+  var email = document.getElementById('cEmail').value.trim();
+  var senha = document.getElementById('cSenha').value;
+  var aviso = document.getElementById('contaMsg');
+  if (!email || senha.length < 6) { aviso.textContent = 'E-mail e senha de 6 dígitos no mínimo.'; return; }
+
+  var corpo = { email: email, senha: senha };
+  if (modoConta === 'criar') {
+    corpo.nome = document.getElementById('cNome').value.trim();
+    corpo.zap = document.getElementById('cZap').value.trim();
+    corpo.indicacao = document.getElementById('indicacao').value.trim();
+  }
+
+  fetch(url('/api/' + (modoConta === 'criar' ? 'cadastro' : 'entrar')), {
+    method: 'POST', credentials: 'include',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(corpo)
+  }).then(function (r) { return r.json().then(function (d) { return { ok: r.ok, d: d }; }); })
+    .then(function (res) {
+      if (!res.ok) { aviso.textContent = res.d.erro || 'Não deu.'; return; }
+      conta = res.d.usuario || null;
+      document.getElementById('btnConta').textContent = conta ? conta.nome.split(' ')[0] : 'Conta';
+      fecharConta();
+      tocar(780, 0.12);
+    }).catch(function () { aviso.textContent = 'Servidor fora.'; });
+}
+
+/* ---------- chat ---------- */
+
+function alternarChat() {
+  var j = document.getElementById('chatJanela');
+  j.classList.toggle('aberta');
+  if (j.classList.contains('aberta')) {
+    abrirChat();
+    document.getElementById('chatTexto').focus();
+  } else clearInterval(chatTimer);
+  somClique();
+}
+
+function abrirChat() {
+  if (chatId) { buscarChat(); return; }
+  fetch(url('/api/chat/abrir'), { method: 'POST', credentials: 'include' })
+    .then(function (r) { return r.json(); })
+    .then(function (d) {
+      chatId = d.id;
+      try { localStorage.setItem(CHAVE_CHAT, String(chatId)); } catch (e) {}
+      buscarChat();
+      chatTimer = setInterval(buscarChat, 4000);
+    }).catch(function () {});
+}
+
+function buscarChat() {
+  if (!chatId) return;
+  fetch(url('/api/chat/' + chatId + '?desde=' + chatUltimo), { cache: 'no-store' })
+    .then(function (r) { return r.json(); })
+    .then(function (lista) {
+      var corpo = document.getElementById('chatCorpo');
+      for (var i = 0; i < lista.length; i++) {
+        var d = document.createElement('div');
+        d.className = 'chat-msg ' + (lista[i].de === 'loja' ? 'loja' : 'cliente');
+        d.textContent = lista[i].texto;
+        corpo.appendChild(d);
+        chatUltimo++;
+      }
+      if (lista.length) { corpo.scrollTop = corpo.scrollHeight; tocar(560, 0.07); }
+    }).catch(function () {});
+}
+
+function enviarChat() {
+  var campo = document.getElementById('chatTexto');
+  var texto = campo.value.trim();
+  if (!texto || !chatId) return;
+  campo.value = '';
+  fetch(url('/api/chat/' + chatId), {
+    method: 'POST', credentials: 'include',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ texto: texto })
+  }).then(buscarChat).catch(function () {});
+  somClique();
+}
+
+/* ---------- easter egg ---------- */
+
+var konami = ['ArrowUp', 'ArrowUp', 'ArrowDown', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'ArrowLeft', 'ArrowRight', 'b', 'a'];
+var konamiPos = 0;
+
+document.addEventListener('keydown', function (e) {
+  if (e.key === konami[konamiPos]) {
+    konamiPos++;
+    if (konamiPos === konami.length) { konamiPos = 0; abrirEgg(); }
+  } else konamiPos = 0;
 });
 
-app.post('/api/admin/diario', exigirAdmin, (req, res) => {
-  if (!req.body.texto) return res.status(400).json({ erro: 'vazio' });
-  db.prepare('INSERT INTO diario (texto, criado_em) VALUES (?, ?)').run(String(req.body.texto).slice(0, 300), Date.now());
-  res.json({ ok: true });
-});
+function abrirEgg() {
+  var c = 'EGG' + Math.floor(100 + Math.random() * 900);
+  document.getElementById('eggCod').textContent = c;
+  document.getElementById('eggCaixa').classList.add('aberto');
+  gravar(CHAVE_CUPOM, c);
+  tocar(880, 0.2);
+}
 
-app.post('/api/admin/lote', exigirAdmin, (req, res) => {
-  const { nome, foto, origem, entrada, aparencia, cheiro, preco_g } = req.body || {};
-  if (!nome || !preco_g) return res.status(400).json({ erro: 'faltou dado' });
-  const r = db.prepare(`INSERT INTO lotes (nome, foto, origem, entrada, aparencia, cheiro, preco_g)
-    VALUES (?, ?, ?, ?, ?, ?, ?)`).run(nome, foto || null, origem || null, entrada || null, aparencia || null, cheiro || null, Number(preco_g));
-  res.json({ ok: true, id: r.lastInsertRowid });
-});
+function fecharEgg() { document.getElementById('eggCaixa').classList.remove('aberto'); }
 
-app.listen(PORT, () => console.log('Cabo Brisa em http://localhost:' + PORT));
+/* ---------- estado ---------- */
+
+function sincronizar() {
+  fetch(url('/api/estado'), { cache: 'no-store', credentials: 'include' })
+    .then(function (r) { return r.ok ? r.json() : null; })
+    .then(function (d) {
+      if (!d) return;
+      remoto = true;
+      if (d.estoque) { ESTOQUE.maconha = d.estoque.maconha; ESTOQUE.cocaina = d.estoque.cocaina; }
+      if (d.usuario) {
+        conta = d.usuario;
+        document.getElementById('btnConta').textContent = conta.nome.split(' ')[0];
+      }
+    }).catch(function () { remoto = false; });
+}
+
+/* ---------- início ---------- */
+
+document.getElementById('btnWhats').addEventListener('click', cliqueCheckout);
+document.getElementById('btnTelegram').addEventListener('click', cliqueCheckout);
+document.getElementById('cZap').addEventListener('input', function () { mascaraZap(this); });
+
+if (ler(CHAVE_SOM, true) === false) {
+  somLigado = false;
+  document.getElementById('btnSom').textContent = 'Mudo';
+}
+
+carregar();
+montarCards();
+montarKits();
+montarPerfil();
+atualizarAmostra();
+calcularBaseado();
+render();
+carregarRanking();
+carregarDiario();
+carregarAval();
+restaurarEspera();
+sincronizar();
+
+var ref = new URLSearchParams(location.search).get('ref');
+if (ref) document.getElementById('indicacao').value = ref.toUpperCase();
+
+document.addEventListener('click', function () { if (!audioCtx) iniciarAmbiente(); }, { once: true });
+document.addEventListener('visibilitychange', function () {
+  var a = document.getElementById('ambiente');
+  if (document.hidden) a.pause();
+  else if (somLigado) a.play().catch(function () {});
+});
