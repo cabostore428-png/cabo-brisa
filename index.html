@@ -1264,7 +1264,7 @@ document.addEventListener('visibilitychange', function () {
   if (document.hidden) a.pause();
   else if (somLigado) a.play().catch(function () {});
 });
-let meuChatId = localStorage.getItem('meuChatId3');
+let meuChatId = localStorage.getItem('meuChatId6');
 async function enviarChat() {
   const input = document.getElementById('chatTexto');
   const texto = input.value.trim();
@@ -1278,7 +1278,7 @@ async function enviarChat() {
     });
     const dados = await r.json();
     meuChatId = dados.id;
-    localStorage.setItem('meuChatId3', meuChatId);
+    localStorage.setItem('meuChatId6', meuChatId);
 alert(JSON.stringify(dados));
   }
 
