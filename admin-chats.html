@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Chats da Loja</title>
+<style>body{font-family:Arial;padding:15px}button{display:block;width:100%;padding:12px;margin:5px 0;text-align:left}#msgs{border:1px solid #ccc;height:300px;overflow:auto;padding:10px;margin:10px 0}input{width:70%;padding:10px}</style>
+</head><body>
+<h2>Chats da Loja</h2>
+<button onclick="carregar()">Atualizar lista</button>
+<div id="lista"></div>
+<h3 id="titulo">Selecione um chat</h3>
+<div id="msgs"></div>
+<input id="texto" placeholder="Digite sua resposta...">
+<button onclick="enviar()">Enviar como Loja</button>
+
+<script>
+let chatAtual = null;
+async function carregar(){
+  const r = await fetch('/api/chats');
+  const chats = await r.json();
+  const lista = document.getElementById('lista');
+  lista.innerHTML = '';
+  if(chats.length === 0) lista.innerHTML = '<p>Nenhum chat ainda.</p>';
+  chats.forEach(c => {
+    const b = document.createElement('button');
+    b.textContent = 'Chat #' + c.id + ' - ' + c.mensagens.length + ' mensagens';
+    b.onclick = () => abrir(c.id);
+    lista.appendChild(b);
+  });
+}
+async function abrir(id){
+  chatAtual = id;
+  document.getElementById('titulo').textContent = 'Chat #' + id;
+  const r = await fetch('/api/chat/' + id);
+  const msgs = await r.json();
+  document.getElementById('msgs').innerHTML = msgs.map(m => '<p><b>' + m.de + ':</b> ' + m.texto + '</p>').join('');
+}
+async function enviar(){
+  const texto = document.getElementById('texto').value;
+  if(!texto || !chatAtual) return alert('Selecione um chat primeiro');
+  await fetch('/api/chat/' + chatAtual, { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({ texto, de: 'Loja', para: 'cliente' }) });
+  document.getElementById('texto').value = '';
+  abrir(chatAtual);
+}
+carregar();
+setInterval(() => { if(chatAtual) abrir(chatAtual); }, 3000);
+</script></body></html>
