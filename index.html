@@ -1279,7 +1279,7 @@ async function enviarChat() {
     const dados = await r.json();
     meuChatId = dados.id;
     localStorage.setItem('meuChatId2', meuChatId);
-alert('Chat ID: ' + dados.id);
+alert(JSON.stringify(dados));
   }
 
   await fetch('/api/chat/' + meuChatId, {
