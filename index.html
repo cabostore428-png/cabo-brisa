@@ -1294,38 +1294,21 @@ alert(JSON.stringify(dados));
   corpo.scrollTop = corpo.scrollHeight;
 }
 </script>
-  <script>
+<script>
 async function enviarMensagem() {
-  const input = document.querySelector('input[type="text"]') || document.querySelector('input');
+  alert('clicou!');
+  const input = document.querySelector('input[placeholder*="mensagem"]') || document.querySelector('input[type="text"]');
+  alert('texto: ' + (input ? input.value : 'sem input'));
   const texto = input.value.trim();
   if (!texto) return;
-
-  let chatId = localStorage.getItem('meuChatId7');
-  if (!chatId) {
-    const r = await fetch('/api/chat/abrir', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ usuario: 'eu' })
-    });
-    const d = await r.json();
-    chatId = d.id;
-    localStorage.setItem('meuChatId7', chatId);
-  }
-
-  await fetch('/api/chat/' + chatId, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ texto: texto, autor: 'eu' })
-  });
-
+  alert('vai enviar: ' + texto);
   input.value = '';
-  const div = document.querySelector('#chat') || document.querySelector('#mensagens') || document.body;
   const p = document.createElement('p');
   p.textContent = texto;
-  div.appendChild(p);
+  document.body.appendChild(p);
 }
-
 const btn = [...document.querySelectorAll('button')].find(b => b.textContent.toLowerCase().includes('enviar'));
+alert('botao achado? ' + (btn ? 'sim' : 'nao'));
 if (btn) btn.onclick = enviarMensagem;
 </script>
 </body>
