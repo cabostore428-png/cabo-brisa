@@ -51,7 +51,7 @@ if (req.url.includes('/api/chat/abrir') && req.method === 'POST') {
   return;
 }
 
-if (req.url.includes('/api/chat/') && req.method === 'GET') {
+if (req.url.includes('/api/chat/') && req.method === 'GET' && !req.url.includes('/abrir')) {
   const id = Number(req.url.split('/api/chat/')[1]);
   const chat = chats.find(c => c.id === id);
   res.writeHead(200, { 'Content-Type': 'application/json' });
