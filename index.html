@@ -1295,21 +1295,27 @@ alert(JSON.stringify(dados));
 }
 </script>
 <script>
-async function enviarMensagem() {
+document.addEventListener('click', async function(e) {
+  const btn = e.target.closest('button');
+  if (!btn) return;
+  if (!btn.textContent.toLowerCase().includes('enviar')) return;
+
+  e.preventDefault();
+  e.stopPropagation();
   alert('clicou!');
-  const input = document.querySelector('input[placeholder*="mensagem"]') || document.querySelector('input[type="text"]');
+
+  const input = document.querySelector('input[placeholder*="mensagem"]') || document.querySelector('input[type="text"]') || document.querySelector('input');
   alert('texto: ' + (input ? input.value : 'sem input'));
   const texto = input.value.trim();
   if (!texto) return;
-  alert('vai enviar: ' + texto);
+
   input.value = '';
   const p = document.createElement('p');
   p.textContent = texto;
+  p.style.padding = '10px';
   document.body.appendChild(p);
-}
-const btn = [...document.querySelectorAll('button')].find(b => b.textContent.toLowerCase().includes('enviar'));
-alert('botao achado? ' + (btn ? 'sim' : 'nao'));
-if (btn) btn.onclick = enviarMensagem;
+  alert('mostrou na tela!');
+});
 </script>
 </body>
 </html>
