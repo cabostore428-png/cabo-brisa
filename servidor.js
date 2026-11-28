@@ -29,6 +29,49 @@ const server = http.createServer((req, res) => {
     });
     return;
   }
+  let chats = [];
+let proximoChatId = 1;
+
+  if (req.url.includes('/api/chats') && req.method === 'GET') {
+  res.writeHead(200, { 'Content-Type': 'application/json' });
+  res.end(JSON.stringify(chats));
+  return;
+}
+
+if (req.url.includes('/api/chat/abrir') && req.method === 'POST') {
+  let body = '';
+  req.on('data', c => body += c);
+  req.on('end', () => {
+    const dados = JSON.parse(body || '{}');
+    const novo = { id: proximoChatId++, vendedorId: dados.vendedorId, mensagens: [] };
+    chats.push(novo);
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ id: novo.id }));
+  });
+  return;
+}
+
+if (req.url.includes('/api/chat/') && req.method === 'GET') {
+  const id = Number(req.url.split('/api/chat/')[1]);
+  const chat = chats.find(c => c.id === id);
+  res.writeHead(200, { 'Content-Type': 'application/json' });
+  res.end(JSON.stringify(chat ? chat.mensagens : []));
+  return;
+}
+
+if (req.url.includes('/api/chat/') && req.method === 'POST') {
+  const id = Number(req.url.split('/api/chat/')[1]);
+  let body = '';
+  req.on('data', c => body += c);
+  req.on('end', () => {
+    const dados = JSON.parse(body || '{}');
+    const chat = chats.find(c => c.id === id);
+    if (chat) chat.mensagens.push({ texto: dados.texto, de: dados.de, para: dados.para });
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ ok: true }));
+  });
+  return;
+}
  let caminho = req.url.split('?')[0];
 let file = caminho === '/' ? '/index.html' : caminho;
   let filePath = path.join(__dirname, file);
