@@ -841,6 +841,7 @@ function sincronizar() {
 }
 
 /* ---------- início ---------- */
+if (typeof document !== 'undefined') {
 
 document.getElementById('btnWhats').addEventListener('click', cliqueCheckout);
 document.getElementById('btnTelegram').addEventListener('click', cliqueCheckout);
@@ -873,3 +874,4 @@ document.addEventListener('visibilitychange', function () {
   if (document.hidden) a.pause();
   else if (somLigado) a.play().catch(function () {});
 });
+}
