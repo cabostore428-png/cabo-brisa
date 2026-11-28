@@ -36,7 +36,7 @@ var CUPOM_VALOR = 5;
 var INDICACAO_VALOR = 2;
 var NL = String.fromCharCode(10);
 
-var API = 'https://api.cabostore.de';
+var API = '';
 
 var PRODUTOS = {
   maconha: { nome: 'Prensado', desde: 'lote prensado, 5 g no mínimo', precoG: 5, min: 5, passo: 5, foto: 'lote1.jpg' },
