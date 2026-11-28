@@ -1,5 +1,6 @@
 let usuarios = [];
-
+let chats = [];
+let proximoChatId = 1;
 const http = require('http');
 const fs = require('fs');
 const path = require('path');
@@ -25,7 +26,26 @@ const server = http.createServer((req, res) => {
         if (achado) return res.end(JSON.stringify({ ok: true, usuario: achado }));
         return res.end(JSON.stringify({ ok: false, erro: 'Conta não encontrada. Crie uma conta primeiro.' }));
       }
-      return res.end(JSON.stringify([]));
+      if (req.url.includes('/api/chat/abrir') && req.method === 'POST') {
+  const novo = { id: proximoChatId++, usuario: dados.usuario, mensagens: [] };
+  chats.push(novo);
+  return res.end(JSON.stringify({ id: novo.id }));
+}
+if (req.url.includes('/api/chat/') && req.method === 'GET') {
+  const id = parseInt(req.url.split('/api/chat/')[1]);
+  const chat = chats.find(c => c.id === id);
+  return res.end(JSON.stringify(chat ? chat.mensagens : []));
+}
+if (req.url.includes('/api/chat/') && req.method === 'POST') {
+  const id = parseInt(req.url.split('/api/chat/')[1]);
+  const chat = chats.find(c => c.id === id);
+  if (chat) {
+    chat.mensagens.push({ texto: dados.texto, autor: dados.autor });
+    return res.end(JSON.stringify(chat.mensagens));
+  }
+  return res.end(JSON.stringify([]));
+}
+return res.end(JSON.stringify([]));
     });
     return;
   }
