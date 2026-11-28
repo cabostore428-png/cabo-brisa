@@ -1,3 +1,20 @@
+const http = require('http');
+const fs = require('fs');
+const path = require('path');
+
+const server = http.createServer((req, res) => {
+  let file = req.url === '/' ? '/index.html' : req.url;
+  let filePath = path.join(__dirname, file);
+  fs.readFile(filePath, (err, data) => {
+    if (err) { res.writeHead(404); return res.end('nao achado'); }
+    res.writeHead(200);
+    res.end(data);
+  });
+});
+
+const PORT = process.env.PORT || 3000;
+server.listen(PORT, () => console.log('rodando na porta ' + PORT));
+
 /* ===== Cabo Brisa — script completo v9 ===== */
 
 var CHAVE = 'cabo-brisa-carrinho-9';
