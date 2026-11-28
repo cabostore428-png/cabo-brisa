@@ -29,7 +29,8 @@ const server = http.createServer((req, res) => {
     });
     return;
   }
-  let file = req.url === '/' ? '/index.html' : req.url;
+ let caminho = req.url.split('?')[0];
+let file = caminho === '/' ? '/index.html' : caminho;
   let filePath = path.join(__dirname, file);
   fs.readFile(filePath, (err, data) => {
     if (err) { res.writeHead(404); return res.end('nao achado'); }
