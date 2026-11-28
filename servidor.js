@@ -806,13 +806,14 @@ function enviarChat() {
 var konami = ['ArrowUp', 'ArrowUp', 'ArrowDown', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'ArrowLeft', 'ArrowRight', 'b', 'a'];
 var konamiPos = 0;
 
+if (typeof document !== 'undefined') {
 document.addEventListener('keydown', function (e) {
   if (e.key === konami[konamiPos]) {
     konamiPos++;
     if (konamiPos === konami.length) { konamiPos = 0; abrirEgg(); }
   } else konamiPos = 0;
 });
-
+}
 function abrirEgg() {
   var c = 'EGG' + Math.floor(100 + Math.random() * 900);
   document.getElementById('eggCod').textContent = c;
