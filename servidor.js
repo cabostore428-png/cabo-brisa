@@ -1,8 +1,34 @@
+let usuarios = [];
+
 const http = require('http');
 const fs = require('fs');
 const path = require('path');
 
 const server = http.createServer((req, res) => {
+  if (req.url.startsWith('/api/')) {
+    res.setHeader('Access-Control-Allow-Origin', '*');
+    res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+    res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+    res.setHeader('Content-Type', 'application/json');
+    if (req.method === 'OPTIONS') return res.end('{}');
+    let body = '';
+    req.on('data', c => body += c);
+    req.on('end', () => {
+      let dados = {};
+      try { dados = body ? JSON.parse(body) : {}; } catch(e){}
+      if (req.url.includes('usuarios') || req.url.includes('register') || req.url.includes('criar')) {
+        usuarios.push(dados);
+        return res.end(JSON.stringify({ ok: true, usuario: dados }));
+      }
+      if (req.url.includes('login') || req.url.includes('entrar')) {
+        let achado = usuarios.find(u => u.email === dados.email && u.senha === dados.senha);
+        if (achado) return res.end(JSON.stringify({ ok: true, usuario: achado }));
+        return res.end(JSON.stringify({ ok: false, erro: 'Conta não encontrada. Crie uma conta primeiro.' }));
+      }
+      return res.end(JSON.stringify([]));
+    });
+    return;
+  }
   let file = req.url === '/' ? '/index.html' : req.url;
   let filePath = path.join(__dirname, file);
   fs.readFile(filePath, (err, data) => {
